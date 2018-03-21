@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-HBVpy_dev
-=========
+HBVpy
+=====
 
 Provides :
     1. Bindings to run HBV-light from python scripts.
