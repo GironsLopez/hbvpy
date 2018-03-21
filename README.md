@@ -12,4 +12,4 @@ This package provides:
 
 HBV-light is a semi-distributed model to simulate catchment runoff.
 
-- **HBV-light website:** http://www.geo.uzh.ch/en/units/h2k/Services/HBV-Model.html
+- **Website:** http://www.geo.uzh.ch/en/units/h2k/Services/HBV-Model.html
