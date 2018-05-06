@@ -1825,6 +1825,9 @@ class SWE(Raster):
                 swe_m = np.ma.masked_array(data=swe, mask=elev_m)
                 obs_swe.loc[self.date(), names[i]] = np.mean(swe_m)
 
+        # Delete empty columns
+        obs_swe = obs_swe.dropna(axis=1, how='all')
+
         # return vals
         return obs_swe
 
@@ -1977,7 +1980,7 @@ class DEM(Raster):
 
         Returns
         -------
-        Pandas.DataFrame
+        df : Pandas.DataFrame
             DataFrame containing the area percentage data for each elevation
             band.
 
@@ -2001,7 +2004,10 @@ class DEM(Raster):
             areas.append(band_cells / sum(hist))
 
         # Create a Pandas.DataFrame with the area percentages
-        return pd.DataFrame(data=areas, index=elevs, columns=['Area_1_1'])
+        df = pd.DataFrame(data=areas, index=elevs, columns=['Area_1_1'])
+
+        # HACK: Save only elevation zones with non-zero area percentages
+        return df[df['Area_1_1'] != 0]
 
 
 class Evap(object):
