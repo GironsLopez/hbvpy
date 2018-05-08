@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-hbvpy_dev.model
+hbvpy.model
 ===============
 
 **A package to run the command line version of HBV-light.**
@@ -24,28 +24,36 @@ __all__ = ['HBVcatchment', 'HBVscenario']
 
 class HBV(object):
     """
-    Call the command line version of HBV-light (HBV-light-CLI.exe).
+    Set the command line version of HBV-light (HBV-light-CLI.exe).
 
     Attributes
     ----------
-    hbv : str, optional
+    hbv_path : str, optional
         Non-default HBV-light-CLI.exe path, default is None.
 
-    """
-    def __init__(self, hbv=None):
+    Raises
+    ------
+    ValueError
+        If the specified path to the HBV-light-CLI.exe file does not exist.
 
-        if hbv is None:
-            self.hbv = 'C:\\Program Files (x86)\\HBV-light\\HBV-light-CLI.exe'
+    """
+    def __init__(self, hbv_path=None):
+
+        if hbv_path is None:
+            self.hbv_path = 'C:\\Program Files (x86)\\HBV-light\\HBV-light-CLI.exe'
 
         else:
-            self.hbv = hbv
+            self.hbv_path = hbv_path
+
+        if not os.path.exists(self.hbv_path):
+            raise ValueError('The specified HBV-ligh-CLI.exe file does not exist.')
 
 
 class HBVscenario(HBV):
     """
     HBV-light scenario.
 
-    This class defines the input data and configuration files defining
+    This class defines the input data and configuration files for setting up
     a particular simulation scenario.
 
     HBV-light will search for the default files in the data directory and use
@@ -55,7 +63,7 @@ class HBVscenario(HBV):
 
     Attributes
     ----------
-    hbv : str, optional
+    hbv_path : str, optional
         Non-default HBV-light-CLI.exe path, default is None.
     c : str, optional
         File with catchment settings, default is 'Clarea.xml'.
@@ -101,7 +109,7 @@ class HBVscenario(HBV):
     """
 
     def __init__(
-            self, hbv=None, c='Clarea.xml', p='Parameter.xml',
+            self, hbv_path=None, c='Clarea.xml', p='Parameter.xml',
             s='Simulation.xml', ptq='ptq.txt', evap='EVAP.txt',
             tmean='T_mean.txt', ptcalt='PTCALT.txt', sc='SubCatchment.txt',
             b='Batch.txt', ps='P_series.txt', ts='T_series.txt',
@@ -109,7 +117,7 @@ class HBVscenario(HBV):
             mcs='MC_Simulation.txt', gaps='GAP_Simulation.txt',
             results='Results', summary='Summary.txt', g='GlacierProfile.txt'):
 
-        super().__init__(hbv)
+        super().__init__(hbv_path)
 
         self.results_folder = results
 
