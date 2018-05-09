@@ -1,24 +1,26 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-hbvpy_dev.data
-==============
+hbvpy.data
+==========
 
-**A package to process the necessary data for HBV-light**
+**A package to pre-process the necessary data for HBV-light**
 
-This package is intended to provide functions and method to pre-process
-all the types of input data necessary for running HBV-light. More specifically,
-it allows to process the following data types (products):
+This package is intended to provide functions and methods to pre-process
+all the types of input data necessary for running HBV-light in Swiss
+catchments. More specifically, it allows to process the following
+data types (products):
 
 * NetCDF :
     TabsD, TmaxD, TminD, RhiresD, RdisaggH, SIS, SrelD (all from MeteoSwiss).
 * Raster :
-    SWE (SLF), MOD10A1 (MODIS), DEM.
+    SWE (SLF), MOD10A1 (MODIS), DEM (swisstopo).
 * Shape :
     Basin shape (BAFU).
 * Point :
-    Potential evapotranspiration, runoff (FOEN),
-    relative humidity (MeteoSwiss), wind speed (MeteoSwiss).
+    Relative humidity (MeteoSwiss), wind speed (MeteoSwiss).
+* Other :
+    Potential evapotranspiration, runoff (FOEN)
 
 .. author:: Marc Girons Lopez
 
@@ -175,6 +177,9 @@ class NetCDF(object):
             no_data = ds.variables[self.DATA].getncattr('missing_value')
             data[data == no_data] = np.nan
 
+        else:
+            pass
+
         # Load the latitude variable to check for inverted array.
         lat = ds.variables[self.LAT][:]
 
@@ -198,7 +203,7 @@ class NetCDF(object):
     def geotransform(self):
         """
         Get the geotransform information of the NetCDF dataset using the
-        default format in the GDAL library.
+        default format of the GDAL library.
 
         Format: (min(lon), res(lon), ??, max(lat), ??, -res(lat))
 
@@ -310,6 +315,11 @@ class NetCDF(object):
             Datetime object containing the corresponding date
             to the given datenum.
 
+        Raises
+        ------
+        ValueError
+            If the time step is not recognised.
+
         """
         ds = Dataset(self.fn, 'r')
 
@@ -381,7 +391,7 @@ class NetCDF(object):
         masked_data = np.empty_like(data)
         for d in range(ntimes):
             masked_data[d] = np.ma.array(data[d], mask=basin_mask)
-        # print(masked_data)
+
         return masked_data
 
     def average(self, shp_fn=None, date_list=None, value_list=None,
@@ -1235,9 +1245,9 @@ class Point(object):
 
         Parameters
         ----------
-        degree : float
+        degree : int
             Degree component.
-        minute : float
+        minute : int
             Minute component.
 
         Returns
@@ -2016,19 +2026,19 @@ class Evap(object):
 
     """
     # Constants
-    SC = 117.573e3  # Solar constant (KJ m-2 day-1)
-    L = 2264.705    # Latent heat flux (KJ Kg-1)
-    RHO = 1000      # Density of water (Kg m-3)
+    SC = 0.0820  # Solar constant (MJ m-2 min-1),
+    L = 2.26     # Latent heat flux (MJ Kg-1)
+    RHO = 1000   # Density of water (Kg m-3)
 
     @classmethod
     def extraterrestrial_radiation(cls, lat, j):
         """
         Calculate the potential extraterrestrial solar radiation.
 
-        Based on Eq. 3 in:
-        Todd Walter 2005, Process-based snowmelt modeling: does it
-        require more input data than temperature-index modeling?.
-        Journal of hydrology 300 p. 65-75.
+        Based on Eq. 21, 23, 24, 25 in:
+        Allen et al. (1998) Crop evapotranspiration - Guidelines
+        for computing crop water requirements - FAO Irrigation and
+        drainage paper 56.
 
         Parameters
         ----------
@@ -2047,17 +2057,19 @@ class Evap(object):
         # Transform latitude from degrees to radians
         lat_rad = lat * (np.pi / 180)
 
-        # Calculate the solar declination (Rosenberg, 1974)
-        dec = 0.4102 * np.cos((2 * np.pi * (j - 172)) / 365)
+        # Calculate the solar declination
+        dec = 0.409 * np.sin((2 * np.pi) / 365 * j - 1.39)
 
-        # Calculate the extraterrestrial solar radiation (kj m-2 day-1)
-        part_1 = np.arccos(-np.tan(dec) * np.tan(lat_rad))
-        part_2 = np.sin(lat_rad) * np.sin(dec)
-        part_3 = np.cos(lat_rad) * np.cos(dec)
-        re = (cls.SC / np.pi) * (part_1 * part_2 + part_3 * np.sin(part_1))
+        # Calculate the inverse relative distance Earth-Sun
+        dr = 1 + 0.033 * np.cos((2 * np.pi) / 365 * j)
 
-        # kJ m-2 day-1
-        return re
+        # Calculate the sunset hour angle
+        sha = np.arccos(-np.tan(lat_rad) * np.tan(dec))
+
+        # Calculate the extraterrestrial solar radiation (MJ m-2 day-1)
+        return ((24 * 60) / np.pi) * cls.SC * dr * (
+                sha * np.sin(lat_rad) * np.sin(dec) +
+                np.cos(lat_rad) * np.cos(dec) * np.sin(sha))
 
     @classmethod
     def mean_monthly_radiation(cls, lat):
@@ -2148,11 +2160,11 @@ class Runoff(object):
             DataFrame including streamflow data for each time step.
 
         """
-        return pd.read_csv(self.fn, sep='-|;', skiprows=7,
-                           skipinitialspace=True, usecols=[1, 3],
-                           index_col=0, names=['Date', 'Q'],
-                           header=None, parse_dates=True, squeeze=True,
-                           infer_datetime_format=True, engine='python')
+        return pd.read_csv(
+                self.fn, sep='-|;', skiprows=7, skipinitialspace=True,
+                usecols=[1, 3], index_col=0, names=['Date', 'Q'], header=None,
+                parse_dates=True, squeeze=True, infer_datetime_format=True,
+                engine='python')
 
     def units(self):
         """
@@ -2263,7 +2275,7 @@ class BasinShape(object):
             'einzugsgebietsgliederungschweizausgabe2015.zip'
             )
 
-    def __init__(self, stn_code):  # , shp_fn):
+    def __init__(self, stn_code):
 
         self.code = stn_code
 
@@ -2271,8 +2283,6 @@ class BasinShape(object):
 
         if not os.path.exists(self.path_tmp):
             os.makedirs(self.path_tmp)
-
-        # self.shp_fn = shp_fn
 
     def _download_data(self, zipurl):
         """
@@ -2449,13 +2459,6 @@ class BasinShape(object):
         # Close the data source and target
         del src_ds, dst_ds
 
-    def _clean_files(self):
-        """
-        Clean the temporary files downloaded from BAFU.
-
-        """
-        shutil.rmtree(self.path_tmp)
-
     def generate(self, shp_fn, keep_files=False):
         """
         """
@@ -2470,7 +2473,7 @@ class BasinShape(object):
 
         if keep_files is False:
             # Clean the temporary files
-            self._clean_files()
+            shutil.rmtree(self.path_tmp)
 
     def station_name(self, keep_files=False):
         """
@@ -2496,7 +2499,8 @@ class BasinShape(object):
         del src_ds
 
         if keep_files is False:
-            self._clean_files()
+            # Clean the temporary files
+            shutil.rmtree(self.path_tmp)
 
         return name
 
@@ -2518,6 +2522,7 @@ class HBVdata(object):
 
     """
     def __init__(self, bsn_dir):
+
         # The data files are stored in the 'Data' subfolder.
         self.data_dir = bsn_dir + '\\Data\\'
 
@@ -2570,7 +2575,7 @@ class HBVdata(object):
         shp_fn : str, optional
             Path and filename of the shapefile defining the catchment boundary,
             default is None.
-        output : {'average', 'lapse-rate'}, optional
+        output : {'average', 'lapse_rate'}, optional
             Operation to perform to the precipitation data,
             default is 'average'.
         dem_fn : str, optional
@@ -2590,6 +2595,11 @@ class HBVdata(object):
         Pandas.Series
             Pandas Series structure containing the precipitation data.
 
+        Raises
+        ------
+        ValueError
+            If the output format is not provided.
+
         """
         # Preallocate space to store dates and precipitation data.
         dates = []
@@ -2608,7 +2618,7 @@ class HBVdata(object):
                         start=start, end=end, touch_all=touch_all)
                 series_name = 'P'
 
-            elif output == 'lapse-rate':
+            elif output == 'lapse_rate':
                 # Calculate the temperature lapse rate over the catchment.
                 if dem_fn is None:
                     raise ValueError('DEM file for lapse rate '
@@ -2620,7 +2630,7 @@ class HBVdata(object):
                 series_name = 'PCALT'
 
             else:
-                raise ValueError('The provided method is not recognised.')
+                raise ValueError('Output format is not recognised.')
 
         # Return a Pandas.Series object containing the precipitation data.
         return pd.Series(data=vals, index=dates, name=series_name)
@@ -2638,7 +2648,7 @@ class HBVdata(object):
         shp_fn : str, optional
             Path and filename of the shapefile defining the catchment boundary,
             default is None.
-        output : {'average', 'lapse-rate'}, optional
+        output : {'average', 'lapse_rate'}, optional
             Operation to perform to the temperature data, default is 'average'.
         dem_fn : str, optional
             Path and filename of the DEM file to get the elevation data from.
@@ -2656,6 +2666,11 @@ class HBVdata(object):
         -------
         Pandas.Series
             Pandas Series structure containing the temperature data.
+
+        Raises
+        ------
+        ValueError
+            If the output format is not provided.
 
         """
         # Preallocate space to store dates and tempeature data.
@@ -2675,7 +2690,7 @@ class HBVdata(object):
                         start=start, end=end, touch_all=touch_all)
                 series_name = 'T'
 
-            elif output == 'lapse-rate':
+            elif output == 'lapse_rate':
                 # Calculate the temperature lapse rate over the catchment.
                 if dem_fn is None:
                     raise ValueError('DEM file for lapse rate '
@@ -2687,7 +2702,7 @@ class HBVdata(object):
                 series_name = 'TCALT'
 
             else:
-                raise ValueError('Invalid method.')
+                raise ValueError('Output format is not recognised.')
 
         # Return a Pandas.Series object containing the temperature data
         return pd.Series(data=vals, index=dates, name=series_name)
@@ -2871,7 +2886,7 @@ class HBVdata(object):
             if pcalt is True and tcalt is False:
                 # Parse the precipitation data
                 ptcalt = self._parse_precip(
-                        precip_dir, shp_fn=shp_fn, output='lapse-rate',
+                        precip_dir, shp_fn=shp_fn, output='lapse_rate',
                         dem_fn=dem_fn, start=start, end=end,
                         touch_all=touch_all)
                 # Convert fraction to percentage
@@ -2880,7 +2895,7 @@ class HBVdata(object):
             elif pcalt is False and tcalt is True:
                 # Parse the temperature data
                 ptcalt = self._parse_temp(
-                        temp_dir, shp_fn=shp_fn, output='lapse-rate',
+                        temp_dir, shp_fn=shp_fn, output='lapse_rate',
                         dem_fn=dem_fn, start=start, end=end,
                         touch_all=touch_all)
                 # Reverse the temperature lapse rate (HBV-light convention)
@@ -2889,13 +2904,13 @@ class HBVdata(object):
             else:
                 # Parse the precipitation and temperature data
                 p_calt = self._parse_precip(
-                        precip_dir, shp_fn=shp_fn, output='lapse-rate',
+                        precip_dir, shp_fn=shp_fn, output='lapse_rate',
                         dem_fn=dem_fn, start=start, end=end,
                         touch_all=touch_all)
                 # Convert fraction to percentage
                 p_calt = p_calt * 100
                 t_calt = self._parse_temp(
-                        temp_dir, shp_fn=shp_fn, output='lapse-rate',
+                        temp_dir, shp_fn=shp_fn, output='lapse_rate',
                         dem_fn=dem_fn, start=start, end=end,
                         touch_all=touch_all)
                 # Reverse the temperature lapse rate (HBV-light convention)
@@ -3137,6 +3152,11 @@ class HBVdata(object):
         t_mean : Pandas.Series
             Pandas series containing the monthly or daily average temperature
             values.
+
+        Raises
+        ------
+        ValueError
+            If the provided averaging frequency is not recognised.
 
         """
         if save_file is True:
@@ -3583,7 +3603,7 @@ class HBVdata(object):
 
         return meta
 
-    def generate_data(
+    def generate_input_data(
             self, precip_dir, temp_dir, q_dir, swe_dir, sc_dir, sis_dir,
             dem_fn, rh_data_fn, rh_meta_fn, u_data_fn, u_meta_fn, stn_code,
             start=None, end=None, elev_step=100, t_mean_freq='month',
@@ -3706,3 +3726,68 @@ class HBVdata(object):
         # Remove temporary files
         for file in glob.glob(self.data_dir + 'basin*'):
             os.remove(file)
+
+    def load_input_data(self, filename, no_data=-9999):
+        """
+        Load the data from a predefined HBV-light input data file.
+
+        NOTE: Only default input data names are currently accepted. See
+        the documentation of HBV-light for a description of the input data
+        and the default file names.
+
+        Parameters
+        ----------
+        filename : {'EVAP.txt', 'PTCALT.txt', 'ObsSWE.txt', 'PTQ.txt',
+                    'SnowCover.txt', 'T_mean.txt'}
+            Name of the input data file.
+        no_data : int or float, optional
+            Invalid data value, default is -9999.
+
+        Returns
+        -------
+        Pandas.DataFrame or Pandas.Serie
+            Data structure containing the selected input data type.
+
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
+
+        """
+        filepath = self.data_dir + filename
+
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        if filename == 'PTQ.txt':
+            board = pd.read_csv(
+                    filepath, sep='\t', na_values=no_data, index_col=0,
+                    parse_dates=True, skiprows=1, infer_datetime_format=True)
+            board.index.rename('Date', inplace=True)
+
+        elif filename in ['EVAP.txt', 'T_mean.txt']:
+            board = pd.read_csv(filepath)
+            if len(board.index) == 12:
+                board['Month'] = np.arange(1, 13)
+                board.set_index('Month', inplace=True)
+            elif len(board.index) == 365:
+                board['Day'] = np.arange(1, 366)
+                board.set_index('Day', inplace=True)
+
+        elif filename == ' PTCALT.txt':
+            board = pd.read_csv(
+                    filepath, sep='\t', index_col=0, parse_dates=True,
+                    skiprows=1, infer_datetime_format=True, squeeze=True)
+            board.index.rename('Date', inplace=True)
+
+        elif filename in ['SnowCover.txt', 'ObsSWE.txt']:
+            board = pd.read_csv(
+                    filepath, sep='\t', index_col=0, parse_dates=True,
+                    na_values=no_data, infer_datetime_format=True,
+                    squeeze=True)
+            board.index.rename('Date', inplace=True)
+
+        else:
+            raise ValueError('The specified filename is not recognised.')
+
+        return board
