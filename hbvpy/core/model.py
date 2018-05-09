@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 hbvpy.model
-===============
+===========
 
 **A package to run the command line version of HBV-light.**
 
@@ -246,7 +246,8 @@ class HBVcatchment(HBVscenario):
             HBV-light output is shown, default is False.
 
         """
-        command = [self.hbv, 'Run', self.dir, sim_type, self.results_folder]
+        command = [
+                self.hbv_path, 'Run', self.dir, sim_type, self.results_folder]
         command = self._parse_files(command)
 
         process = subprocess.Popen(
