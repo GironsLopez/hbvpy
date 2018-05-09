@@ -148,12 +148,12 @@ class HBVcatchment(HBVscenario):
         """
         self.__scenario = scenario
 
-        self.dir = bsn_dir
+        self.bsn_dir = bsn_dir
 
         self.basin_name = os.path.relpath(bsn_dir, bsn_dir + '..')
 
-        if not os.path.exists(self.dir + self.results_folder):
-            os.makedirs(self.dir + self.results_folder)
+        if not os.path.exists(self.bsn_dir + self.results_folder):
+            os.makedirs(self.bsn_dir + self.results_folder)
 
     def __getattr__(self, attr):
         """
@@ -247,7 +247,8 @@ class HBVcatchment(HBVscenario):
 
         """
         command = [
-                self.hbv_path, 'Run', self.dir, sim_type, self.results_folder]
+                self.hbv_path, 'Run', self.bsn_dir,
+                sim_type, self.results_folder]
         command = self._parse_files(command)
 
         process = subprocess.Popen(
