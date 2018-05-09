@@ -35,15 +35,15 @@ class SingleRun(object):
 
         self.bsn_dir = bsn_dir
 
-    def load_results(self, results_folder, sc=None):
+    def load_results(self, results_folder='Results', sc=None):
         """
         Load the results from a single HBV-light run.
 
         Parameters
         ----------
-        results_folder : str
-            Name of the results folder.
-        sc : int
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
+        sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
 
@@ -76,15 +76,15 @@ class SingleRun(object):
                 filepath, sep='\t', index_col=0,
                 parse_dates=True, infer_datetime_format=True)
 
-    def load_dist_results(self, results_folder, sc=None):
+    def load_dist_results(self, results_folder='Results', sc=None):
         """
         Load the distributed results from a single HBV-light run.
 
         Parameters
         ----------
-        results_folder : str
-            Name of the results folder.
-        sc : int
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
+        sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
 
@@ -117,14 +117,14 @@ class SingleRun(object):
                 filepath, sep='\t', index_col=0,
                 parse_dates=True, infer_datetime_format=True)
 
-    def load_summary(self, results_folder):
+    def load_summary(self, results_folder='Results'):
         """
         Load the summary of the results from a single HBV-light run.
 
         Parameters
         ----------
-        results_folder : str
-            Name of the results folder.
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
 
         Returns
         -------
@@ -150,7 +150,7 @@ class SingleRun(object):
         # Load the summary file.
         return pd.read_csv(filepath, sep='\t', index_col=0)
 
-    def load_peaks(self, results_folder):
+    def load_peaks(self, results_folder='Results'):
         """
         Load the list of peak flows from a single HBV-light run.
 
@@ -160,8 +160,8 @@ class SingleRun(object):
 
         Parameters
         ----------
-        results_folder : str
-            Name of the results folder.
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
 
         Returns
         -------
@@ -189,7 +189,7 @@ class SingleRun(object):
                 filepath, sep='\t', index_col=0, parse_dates=True,
                 infer_datetime_format=True, squeeze=True)
 
-    def load_q_peaks(self, results_folder):
+    def load_q_peaks(self, results_folder='Results'):
         """
         Load the list of observed runoff and peak flows from a single
         HBV-light run.
@@ -200,8 +200,8 @@ class SingleRun(object):
 
         Parameters
         ----------
-        results_folder : str
-            Name of the results folder.
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
 
         Returns
         -------
@@ -245,14 +245,14 @@ class GAPRun(object):
 
         self.bsn_dir = bsn_dir
 
-    def load_results(self, results_folder):
+    def load_results(self, results_folder='Results'):
         """
         Load the results from an HBV-light GAP calibration run.
 
         Parameters
         ----------
-        results_folder : str
-            Name of the GAP results folder.
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
 
         Returns
         -------
@@ -293,15 +293,15 @@ class BatchRun(object):
 
         self.bsn_dir = bsn_dir
 
-    def load_results(self, results_folder, sc=None):
+    def load_results(self, results_folder='Results', sc=None):
         """
         Load the results from a batch HBV-light run.
 
         Parameters
         ----------
-        results_folder : str
-            Name of the Batch Run results folder.
-        sc : int
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
+        sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
 
@@ -332,18 +332,18 @@ class BatchRun(object):
         # Load the results file.
         return pd.read_csv(filepath, sep='\t')
 
-    def load_runoff(self, results_folder, data='columns', sc=None):
+    def load_runoff(self, results_folder='Results', data='columns', sc=None):
         """
         Load the time series of observed and simulated runoff from
         a batch HBV-light Run.
 
         Parameters
         ----------
-        results_folder : str
-            Name of the Batch Run results folder.
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
         data : {'rows', 'columns'}, optional
             Organisation of the data in the results file.
-        sc : int
+        sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
 
@@ -414,7 +414,7 @@ class BatchRun(object):
         else:
             raise ValueError('Data organisation not recognised.')
 
-    def load_runoff_stats(self, results_folder, sc=None):
+    def load_runoff_stats(self, results_folder='Results', sc=None):
         """
         Load the time series of observed and simulated runoff statistics
         from a batch HBV-light Run.
@@ -423,9 +423,9 @@ class BatchRun(object):
 
         Parameters
         ----------
-        results_folder : str
-            Name of the Batch Run results folder.
-        sc : int
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
+        sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
 
@@ -459,18 +459,19 @@ class BatchRun(object):
                 filepath, sep='\t', parse_dates=True,
                 index_col=0, infer_datetime_format=True)
 
-    def load_runoff_comp(self, results_folder, component='Snow', sc=None):
+    def load_runoff_comp(
+            self, results_folder='Results', component='Snow', sc=None):
         """
         Load the time series of a given runoff component from a batch
         HBV-light run.
 
         Parameters
         ----------
-        results_folder : str
-            Name of the Batch Run results folder.
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
         component : {'Rain', 'Snow', 'Glacier', 'Q0', 'Q1', 'Q2'}
             Name of the runoff component to load, default 'Snow'.
-        sc : int
+        sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
 
@@ -525,16 +526,16 @@ class BatchRun(object):
         # Set the index.
         return df.set_index('Date')
 
-    def load_monthly_runoff(self, results_folder, sc=None):
+    def load_monthly_runoff(self, results_folder='Results', sc=None):
         """
         Load the monthly average simulated runoff from each parameter set
         used for a batch HBV-light run.
 
         Parameters
         ----------
-        results_folder : str
-            Name of the Batch Run results folder.
-        sc : int
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
+        sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
 
@@ -567,7 +568,7 @@ class BatchRun(object):
         return pd.read_csv(filepath, sep='\t')
 
     def calculate_runoff_quantile(
-            self, results_folder, data='Columns', quantile=0.5):
+            self, results_folder='Results', data='Columns', quantile=0.5):
         """
         Calculate the time series of runoff magnitudes corresponding to a given
         quantile.
@@ -577,8 +578,8 @@ class BatchRun(object):
 
         Parameters
         ----------
-        results_folder : str
-            Name of the Batch Run results folder.
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
         data : {'rows', 'columns'}, optional
             Organisation of the data in the results file.
         quantile : float, optional
@@ -615,15 +616,15 @@ class MonteCarlo(object):
 
         self.bsn_dir = bsn_dir
 
-    def load_results(self, results_folder, sc=None):
+    def load_results(self, results_folder='Results', sc=None):
         """
         Load the results of a HBV-light Monte Carlo Run.
 
         Parameters
         ----------
-        results_folder : str
-            Name of the MC Run results folder.
-        sc : int
+        results_folder : str, optional
+            Name of the results folder, default is 'Results'.
+        sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
 
