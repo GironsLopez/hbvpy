@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-hbvpy_dev.process
-=================
+hbvpy.process
+=============
 
 **A package to process HBV-light simulation results.**
 
@@ -16,44 +16,14 @@ BatchRun, GAPRun).
 
 import os
 import pandas as pd
-import datetime as dt
 
 
-__all__ = ['HBVresults', 'get_gap_results', 'load_metadata']
+__all__ = ['BatchRun', 'GAPRun', 'MonteCarlo', 'SingleRun']
 
 
-def load_metadata(catchments_dir):
+class SingleRun(object):
     """
-    Load the metadata of all catchments in a given directory.
-
-    Parameters
-    ----------
-    catchments_dir : str
-        Path of the directory where the catchment folders are stored.
-
-    Returns
-    -------
-    metadata : Pandas.DataFrame
-        Data structure containing the metadata for all catchments in the
-        given directory.
-
-    """
-    metadata = pd.DataFrame()
-
-    for root, dirs, files in os.walk(catchments_dir):
-        for file in files:
-            filename = os.path.join(root, file)
-            if file == 'metadata.txt':
-                meta = pd.read_csv(
-                        filename, sep='\t', engine='python', index_col=0)
-                metadata = pd.concat([metadata, meta], axis=0)
-
-    return metadata
-
-
-class HBVresults(object):
-    """
-    Process results from HBV-light simulations.
+    Process results from HBV-light single run simulations.
 
     Attributes
     ----------
@@ -65,167 +35,444 @@ class HBVresults(object):
 
         self.bsn_dir = bsn_dir
 
-        self.basin_name = os.path.relpath(bsn_dir, bsn_dir + '..')
-
-    def load_ptq(self, filename='PTQ.txt', no_data=-9999):
+    def load_results(self, results_folder, sc=None):
         """
-        Load the HBV-light PTQ.txt file.
+        Load the results from a single HBV-light run.
 
         Parameters
         ----------
-        filename : str, optional.
-            File name of the ptq file, default: 'PTQ.txt'.
-        no_data : int or float, optional.
-            Value of NoData values.
+        results_folder : str
+            Name of the results folder.
+        sc : int
+            Sub-catchment number, in case there are more than one
+            sub-catchments, default is None.
 
         Returns
         -------
-        Pandas DataFrame
-            Data structure containing the PTQ data.
-
-        """
-        filename = self.bsn_dir + '\\Data\\' + filename
-
-        return pd.read_csv(filename, sep='\t', na_values=no_data,
-                           index_col=0, parse_dates=True, skiprows=2,
-                           header=None, names=['P', 'T', 'Q'])
-
-    def get_ptq_units(self, filename='PTQ.txt'):
-        """
-        Get the units of the PTQ.txt file to use for labelling figure axes.
-
-        Parameters
-        ----------
-        filename : str, optional.
-            File name of the ptq file, default: 'PTQ.txt'.
-
-        Returns
-        -------
-        p_units : str
-            Precipitation data units.
-        t_units : str
-            Temperature data units.
-        q_units : str
-            Runoss data units.
-
-        """
-        # Load the ptq.txt file
-        ptq = self.load_ptq(filename=filename)
-        # Get the temporal resolution
-        delta = ptq.index.resolution
-
-        p_units = 'Precipitation [mm ' + delta + '^{-1}]'
-        t_units = 'Temperature [$^{\circ}$C]'
-        q_units = 'Runoff [mm ' + delta + '^{-1}]'
-
-        return p_units, t_units, q_units
-
-    @staticmethod
-    def slice_data(data, start=None, end=None):
-        """
-        Get a slice of a Pandas.DataFrame.
-
-        Parameters
-        ----------
-        data : Pandas.DataFrame
-            Pandas DataFrame with the relevant data for plotting.
-        start : '%Y%m%d', optional
-            Start date for the plot, default is None.
-        end : '%Y%m%d', optional
-            End date for the plot, default is None.
-
-        Return
-        ------
         Pandas.DataFrame
-            Slice of input Pandas.DataFrame.
+            Data structure containing the model results.
+
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
 
         """
-        if start is not None and end is not None:
-            start = dt.datetime.strptime(start, '%Y%m%d')
-            end = dt.datetime.strptime(end, '%Y%m%d')
-            return data.loc[start:end]
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
 
-        if start is not None:
-            start = dt.datetime.strptime(start, '%Y%m%d')
-            return data.loc[start:]
-
-        elif end is not None:
-            end = dt.datetime.strptime(end, '%Y%m%d')
-            return data.loc[:end]
-
+        # Set the results filename.
+        if sc is not None:
+            filepath = path + 'Results_SubCatchment_' + str(sc) + '.txt'
         else:
-            return data
+            filepath = path + 'Results.txt'
 
-    def load_gap_results(self, gap_folder):
+        # Check if the results file exists
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        # Load the results file.
+        return pd.read_csv(
+                filepath, sep='\t', index_col=0,
+                parse_dates=True, infer_datetime_format=True)
+
+    def load_dist_results(self, results_folder, sc=None):
         """
-        Load the results of a HBV-light GAP calibration run.
+        Load the distributed results from a single HBV-light run.
 
         Parameters
         ----------
-        gap_folder : str
+        results_folder : str
+            Name of the results folder.
+        sc : int
+            Sub-catchment number, in case there are more than one
+            sub-catchments, default is None.
+
+        Returns
+        -------
+        Pandas.DataFrame
+            Data structure containing the distributed model results.
+
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
+
+        """
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Set the results filename.
+        if sc is not None:
+            filepath = path + 'Dis_SubCatchment_' + str(sc) + '.txt'
+        else:
+            filepath = path + 'Dis.txt'
+
+        # Check if the results file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        # Load the results file.
+        return pd.read_csv(
+                filepath, sep='\t', index_col=0,
+                parse_dates=True, infer_datetime_format=True)
+
+    def load_summary(self, results_folder):
+        """
+        Load the summary of the results from a single HBV-light run.
+
+        Parameters
+        ----------
+        results_folder : str
+            Name of the results folder.
+
+        Returns
+        -------
+        Pandas.DataFrame
+            Data structure containing the distributed model results.
+
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
+
+        """
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Set the summary filename.
+        filepath = path + 'Summary.txt'
+
+        # Check if the summary file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        # Load the summary file.
+        return pd.read_csv(filepath, sep='\t', index_col=0)
+
+    def load_peaks(self, results_folder):
+        """
+        Load the list of peak flows from a single HBV-light run.
+
+        Following the documentation of HBV-light, a peak is defined as a data
+        point with a Qobs value that is at least three times the average Qobs.
+        Only a single peak is allowed in a window of 15 days.
+
+        Parameters
+        ----------
+        results_folder : str
+            Name of the results folder.
+
+        Returns
+        -------
+        Pandas.DataFrame
+            Data structure containing the peak flow dates and values.
+
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
+
+        """
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Set the peaks filename.
+        filepath = path + 'Peaks.txt'
+
+        # Check if the peaks file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        # Load the peaks file.
+        return pd.read_csv(
+                filepath, sep='\t', index_col=0, parse_dates=True,
+                infer_datetime_format=True, squeeze=True)
+
+    def load_q_peaks(self, results_folder):
+        """
+        Load the list of observed runoff and peak flows from a single
+        HBV-light run.
+
+        Following the documentation of HBV-light, a peak is defined as a data
+        point with a Qobs value that is at least three times the average Qobs.
+        Only a single peak is allowed in a window of 15 days.
+
+        Parameters
+        ----------
+        results_folder : str
+            Name of the results folder.
+
+        Returns
+        -------
+        Pandas.DataFrame
+            Data structure containing the observed discharge values as well
+            as the peak flow values.
+
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
+
+        """
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Set the runoff peaks filename.
+        filepath = path + 'Q_Peaks.txt'
+
+        # Check if the runoff peaks file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        # Load the runoff peaks file.
+        return pd.read_csv(
+                filepath, sep='\t', index_col=0, parse_dates=True,
+                infer_datetime_format=True, squeeze=True)
+
+
+class GAPRun(object):
+    """
+    Process results from HBV-light GAP run simulations.
+
+    Attributes
+    ----------
+    bsn_dir : str
+        Basin directory.
+
+    """
+    def __init__(self, bsn_dir):
+
+        self.bsn_dir = bsn_dir
+
+    def load_results(self, results_folder):
+        """
+        Load the results from an HBV-light GAP calibration run.
+
+        Parameters
+        ----------
+        results_folder : str
             Name of the GAP results folder.
 
         Returns
         -------
-        Pandas DataFrame
+        Pandas.DataFrame
             Data structure containing the GAP results.
 
-        """
-        path = self.bsn_dir + '\\' + gap_folder + '\\'
-        filename = path + 'GA_best1.txt'
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
 
-        return pd.read_csv(filename, sep='\t')
-
-    def load_batch_results(self, batch_folder):
         """
-        Load the results of a HBV-light Batch Run.
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Set the results filename.
+        filepath = path + 'GA_best1.txt'
+
+        # Check if the results file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        # Load the results file.
+        return pd.read_csv(filepath, sep='\t')
+
+
+class BatchRun(object):
+    """
+    Process results from HBV-light batch run simulations.
+
+    Attributes
+    ----------
+    bsn_dir : str
+        Basin directory.
+
+    """
+    def __init__(self, bsn_dir):
+
+        self.bsn_dir = bsn_dir
+
+    def load_results(self, results_folder, sc=None):
+        """
+        Load the results from a batch HBV-light run.
 
         Parameters
         ----------
-        batch_folder : str
+        results_folder : str
             Name of the Batch Run results folder.
+        sc : int
+            Sub-catchment number, in case there are more than one
+            sub-catchments, default is None.
 
         Returns
         -------
-        Pandas DataFrame
+        Pandas.DataFrame
             Data structure containing the Batch Run results.
 
-        """
-        path = self.bsn_dir + '\\' + batch_folder + '\\'
-        filename = path + 'BatchRun.txt'
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
 
-        return pd.read_csv(filename, sep='\t')
-
-    def load_batch_runoff(self, batch_folder):
         """
-        Load the runoff time series from a HBV-light Batch Run.
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Set the results filename.
+        if sc is not None:
+            filepath = path + 'BatchRun_SubCatchment_' + str(sc) + '.txt'
+        else:
+            filepath = path + 'BatchRun.txt'
+
+        # Check if the results file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        # Load the results file.
+        return pd.read_csv(filepath, sep='\t')
+
+    def load_runoff(self, results_folder, data='columns', sc=None):
+        """
+        Load the time series of observed and simulated runoff from
+        a batch HBV-light Run.
 
         Parameters
         ----------
-        batch_folder : str
+        results_folder : str
             Name of the Batch Run results folder.
+        data : {'rows', 'columns'}, optional
+            Organisation of the data in the results file.
+        sc : int
+            Sub-catchment number, in case there are more than one
+            sub-catchments, default is None.
 
         Returns
         -------
-        Pandas DataFrame
+        Pandas.DataFrame
             Data structure containing the Batch Run runoff time series.
 
-        """
-        path = self.bsn_dir + '\\' + batch_folder + '\\'
-        filename = path + 'BatchQsimSummary.txt'
+        Raises
+        ------
+        ValueError
+            If the corresponding file does not exist.
+        ValueError
+            If the data structure is not recognised.
 
-        return pd.read_csv(filename, sep='\t', parse_dates=True, index_col=0)
-
-    def load_batch_runoff_comp(self, batch_folder, component='Snow'):
         """
-        Load a given runoff component from a HBV-light Batch Run.
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Load the data according to the predefined format of the results file.
+        if data == 'columns':
+            # Set the runoff results filename.
+            if sc is not None:
+                filepath = path + 'BatchQsim_(InColumns)_' + str(sc) + '.txt'
+            else:
+                filepath = path + 'BatchQsim_(InColumns).txt'
+
+            # Check if the runoff results file exists.
+            if not os.path.exists(filepath):
+                raise ValueError('The file does not exist.')
+
+            # Load the runoff results file.
+            return pd.read_csv(
+                    filepath, sep='\t', parse_dates=True,
+                    index_col=0, infer_datetime_format=True)
+
+        elif data == 'rows':
+            # Set the runoff results filename.
+            if sc is not None:
+                filepath = path + 'BatchQsim_' + str(sc) + '.txt'
+            else:
+                filepath = path + 'BatchQsim.txt'
+
+            # Check if the runoff results file exists.
+            if not os.path.exists(filepath):
+                raise ValueError('The file does not exist.')
+
+            # Parse the index.
+            dates = pd.read_csv(
+                    filepath, sep='\t', header=None, nrows=1,
+                    index_col=False, squeeze=True).transpose()
+
+            # Parse the data.
+            data = pd.read_csv(
+                    filepath, sep='\t', header=None, index_col=False,
+                    skiprows=1).transpose()
+
+            # Rename the index and convert it to datetime format.
+            dates.columns = ['Date']
+            dates = pd.to_datetime(dates['Date'], format='%Y%m%d')
+
+            # Merge the index and data into a Pandas.DataFrame structure.
+            df = pd.concat([data, dates], axis=1)
+
+            # Set the index and return the DataFrame
+            return df.set_index('Date')
+
+        else:
+            raise ValueError('Data organisation not recognised.')
+
+    def load_runoff_stats(self, results_folder, sc=None):
+        """
+        Load the time series of observed and simulated runoff statistics
+        from a batch HBV-light Run.
+
+        The statistics contain: Qobs, Qmedian, Qmean, Qp10, Qp90.
 
         Parameters
         ----------
-        batch_folder : str
+        results_folder : str
+            Name of the Batch Run results folder.
+        sc : int
+            Sub-catchment number, in case there are more than one
+            sub-catchments, default is None.
+
+        Returns
+        -------
+        Pandas.DataFrame
+            Data structure containing the Batch Run runoff statistics
+            time series.
+
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
+
+        """
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Set the runoff statistics filename.
+        if sc is not None:
+            filepath = path + 'BatchQsimSummary_' + str(sc) + '.txt'
+        else:
+            filepath = path + 'BatchQsimSummary.txt'
+
+        # Check if the runoff statistics file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        # Load the runoff statistics file.
+        return pd.read_csv(
+                filepath, sep='\t', parse_dates=True,
+                index_col=0, infer_datetime_format=True)
+
+    def load_runoff_comp(self, results_folder, component='Snow', sc=None):
+        """
+        Load the time series of a given runoff component from a batch
+        HBV-light run.
+
+        Parameters
+        ----------
+        results_folder : str
             Name of the Batch Run results folder.
         component : {'Rain', 'Snow', 'Glacier', 'Q0', 'Q1', 'Q2'}
             Name of the runoff component to load, default 'Snow'.
+        sc : int
+            Sub-catchment number, in case there are more than one
+            sub-catchments, default is None.
 
         Returns
         -------
@@ -233,65 +480,109 @@ class HBVresults(object):
             Data structure containing the Batch Run runoff component
             time series.
 
+        Raises
+        ------
+        ValueError
+            If the provided runoff component is not recognised.
+        ValueError
+            If the specified file does not exist.
+
         """
-        path = self.bsn_dir + '\\' + batch_folder + '\\'
-        filename = path + 'BatchQsim_' + component + '.txt.'
+        # Check if the provided component is valid.
+        if component not in ['Rain', 'Snow', 'Glacier', 'Q0', 'Q1', 'Q2']:
+            raise ValueError('Provided runoff compoent not recognised.')
+
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Set the runoff component filename.
+        if sc is not None:
+            filepath = path + 'BatchQsim_' + component + '_' + str(sc) + '.txt'
+        else:
+            filepath = path + 'BatchQsim_' + component + '.txt.'
+
+        # Check if the runoff component file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
 
         # Parse the index.
-        index = pd.read_csv(filename, sep='\t', header=None, nrows=1,
-                            index_col=False, parse_dates=True,
-                            squeeze=True).transpose()
+        dates = pd.read_csv(
+                filepath, sep='\t', header=None, nrows=1,
+                index_col=False, squeeze=True).transpose()
 
         # Parse the data.
-        data = pd.read_csv(filename, sep='\t', header=None, index_col=False,
-                           skiprows=1).transpose()
+        data = pd.read_csv(
+                filepath, sep='\t', header=None, index_col=False,
+                skiprows=1).transpose()
 
         # Rename the index and convert it to datetime format.
-        index.columns = ['Date']
-        index = pd.to_datetime(index['Date'], format='%Y%m%d')
+        dates.columns = ['Date']
+        dates = pd.to_datetime(dates['Date'], format='%Y%m%d')
 
-        # Merget the index and data into a single Pandas.DataFrame structure.
-        df = pd.concat([data, index], axis=1)
+        # Merge the index and data into a single Pandas.DataFrame structure.
+        df = pd.concat([data, dates], axis=1)
 
         # Set the index.
         return df.set_index('Date')
 
-    def get_snow_fraction(self, batch_folder):
+    def load_monthly_runoff(self, results_folder, sc=None):
         """
-        Get the median snow fraction.
+        Load the monthly average simulated runoff from each parameter set
+        used for a batch HBV-light run.
 
         Parameters
         ----------
-        batch_folder : str
+        results_folder : str
             Name of the Batch Run results folder.
+        sc : int
+            Sub-catchment number, in case there are more than one
+            sub-catchments, default is None.
 
         Returns
         -------
-        float
-            Snow fraction.
+        Pandas.DataFrame
+            Data structure containing the monthly average runoff values
+            from each parameter set.
+
+        Raises
+        ------
+        ValueError
+            If the specifed file does not exist.
 
         """
-        runoff = self.load_batch_runoff(batch_folder)
-        snow = self.load_batch_runoff_comp(batch_folder, component='Snow')
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
 
-        qmedian = self.mean_yearly_runoff(runoff['Qmedian']).sum().median()
-        # q = runoff['Qmedian'].groupby(runoff.index.year).sum().median()
-        smedian = snow.quantile(q=0.50, axis=1)
-        smedian = snow.groupby(smedian.index.year).sum().median()
+        # Set the monthly runoff filename.
+        if sc is not None:
+            filepath = path + 'Qseasonal_' + str(sc) + '.txt'
+        else:
+            filepath = path + 'Qseasonal.txt.'
 
-        return smedian / qmedian
+        # Check if the monthly runoff file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
 
-    def get_batch_runoff_quantile(self, batch_folder, quantile=0.5):
+        # Load the monthly runoff file.
+        return pd.read_csv(filepath, sep='\t')
+
+    def calculate_runoff_quantile(
+            self, results_folder, data='Columns', quantile=0.5):
         """
-        Get the time series of runoff magnitudes corresponding to a given
+        Calculate the time series of runoff magnitudes corresponding to a given
         quantile.
+
+        NOTE: This method only works if the catchment contains a single
+        subcatchment.
 
         Parameters
         ----------
-        batch_folder : str
+        results_folder : str
             Name of the Batch Run results folder.
+        data : {'rows', 'columns'}, optional
+            Organisation of the data in the results file.
         quantile : float, optional
-            Quantile to get the runoff for, default 0.5:
+            Quantile to get the runoff for, default 0.5.
 
         Returns
         -------
@@ -300,174 +591,65 @@ class HBVresults(object):
             quantile.
 
         """
-        path = self.bsn_dir + '\\' + batch_folder + '\\'
-        filename = path + 'BatchQsim_(InColumns).txt'
+        # Load the runoff results data
+        runoff = self.load_runoff(results_folder, data=data, sc=None)
 
-        data = pd.read_csv(filename, sep='\t', parse_dates=True, index_col=0)
-        sim = data.drop('Qobs', axis=1)
+        # Drop the observed runoff column
+        runoff = runoff.drop('Qobs', axis=1)
 
-        return sim.quantile(quantile, axis=1)
-
-    def get_batch_mean_runoff_quantile(self, batch_folder, quantile=0.5):
-        """
-        Get the median runoff magnitude for a given quantile.
-
-        Parameters
-        ----------
-        batch_folder : str
-            Name of the Batch Run results folder.
-        quantile : float, optional
-            Quantile to get the runoff for, default 0.5.
-
-        Returns
-        -------
-        float
-            Observed runoff magnitude corresponding to the given quantile.
-        float
-            Simulated reunoff magnitude corresponding to the given quantile.
-
-        """
-        path = self.bsn_dir + '\\' + batch_folder + '\\'
-        filename = path + 'BatchQsim_(InColumns).txt'
-
-        sim = pd.read_csv(filename, sep='\t', parse_dates=True, index_col=0)
-        obs = sim['Qobs']
-        sim = sim.drop('Qobs', axis=1)
-        sim = sim.median(axis=1)
-
-        return obs.quantile(quantile, axis=0), sim.quantile(quantile, axis=0)
-
-    def mean_daily_runoff(self, runoff_data):
-        """
-        Get the average daily runoff.
-
-        Parameters
-        ----------
-        runoff_data : Pandas.DataFrame or Pandas.Series
-            Time series of runoff data.
-
-        Returns
-        -------
-        Pandas.DataFrame or Pandas.Series
-            Average daily runoff.
-
-        """
-        runoff_year = self.mean_yearly_runoff(runoff_data)
-        runoff_day = runoff_year.cumcount(1) + 1
-
-        return runoff_data.groupby(runoff_day)
-
-    @staticmethod
-    def mean_monthly_runoff(runoff_data):
-        """
-        Get the average monthly runoff.
-
-        Parameters
-        ----------
-        runoff_data : Pandas.DataFrame or Pandas.Series
-            Time series of runoff data.
-
-        Returns
-        -------
-        Pandas.DataFrame or Pandas.Series
-            Average monthly runoff.
-
-        """
-        return runoff_data.groupby(runoff_data.index.month)
-
-    @staticmethod
-    def mean_yearly_runoff(runoff_data):
-        """
-        Get the average yearly runoff.
-
-        Parameters
-        ----------
-        runoff_data : Pandas.DataFrame or Pandas.Series
-            Time series of runoff data.
-
-        Returns
-        -------
-        Pandas.DataFrame or Pandas.Series
-            Average yearly runoff.
-
-        """
-        return runoff_data.groupby(runoff_data.index.year)
+        # Return the time series of the given runoff quantile.
+        return runoff.quantile(quantile, axis=1)
 
 
-def get_gap_results(
-        catchments_dir, catchments, dev_versions, period, obj_fun='SWE_Reff',
-        results_type='absolute', reference='Original'):
+class MonteCarlo(object):
     """
-    Get the median gap results from a number of catchments and development
-    versions.
+    Process results from HBV-light Monte Carlo simulations.
 
-    Parameters
+    Attributes
     ----------
-    catchments_dir : str
-        Path to the directory where the catchment folders are stored.
-    catchments : list
-        List of folders (catchment names) to get the results for.
-    dev_versions : list
-        List of development versions names to get the results for.
-    period : int
-        Simulation period to get the results for.
-    obj_fun : str, optional
-        Objective function to get the results for, default is 'SWE_Reff'.
-    results_type : {'absolute', 'relative', 'rank'}, optional
-        Type of results to return, default is 'absolute'.
-    reference : str, optional
-        Development version to use as reference for the relative results type,
-        default is 'Original'.
-
-    Returns
-    -------
-    Pandas.DataFrame
-        Data structure containing the median results for each catchment and
-        development version.
-
-    Raises
-    ------
-    ValueError
-        If the provided type of results is not recognised.
+    bsn_dir : str
+        Basin directory.
 
     """
-    if results_type == 'relative' and reference is None:
-        raise ValueError('A reference development version needs to be '
-                         'specified to get relative results.')
+    def __init__(self, bsn_dir):
 
-    board = pd.DataFrame(index=catchments, columns=dev_versions)
+        self.bsn_dir = bsn_dir
 
-    for catchment in catchments:
-        catchment_dir = catchments_dir + str(catchment) + '\\'
+    def load_results(self, results_folder, sc=None):
+        """
+        Load the results of a HBV-light Monte Carlo Run.
 
-        for dev_version in dev_versions:
-            if results_type == 'relative' and dev_version == reference:
-                continue
+        Parameters
+        ----------
+        results_folder : str
+            Name of the MC Run results folder.
+        sc : int
+            Sub-catchment number, in case there are more than one
+            sub-catchments, default is None.
 
-            gap_dir = dev_version + '_gap_' + str(period)
-            results = HBVresults(catchment_dir).load_gap_results(gap_dir)
+        Returns
+        -------
+        Pandas.DataFrame
+            Data structure containing the MC Run results.
 
-            if results_type in ['absolute', 'rank']:
-                board.loc[catchment, dev_version] = results[obj_fun].median()
+        Raises
+        ------
+        ValueError
+            If the specified file does not exist.
 
-            elif results_type == 'relative':
-                ref_dir = reference + '_gap_' + str(period)
-                ref_res = HBVresults(catchment_dir).load_gap_results(ref_dir)
+        """
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
 
-                delta = results[obj_fun].median() - ref_res[obj_fun].median()
-                board.loc[catchment, dev_version] = delta
+        # Set the results filename.
+        if sc is not None:
+            filepath = path + 'Multi_SubCatchment_' + str(sc) + '.txt'
+        else:
+            filepath = path + 'Multi.txt'
 
-            else:
-                raise ValueError('Selected results type not valid.')
+        # Check if the results file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
 
-        if results_type == 'rank':
-            data = pd.Series(board.loc[catchment])
-
-            rank = 1
-            for value in data.sort_values(ascending=False):
-                data[data == value] = rank
-                rank += 1
-
-            board.loc[catchment] = data
-
-    return board.apply(pd.to_numeric)
+        # Load the results file.
+        return pd.read_csv(filepath, sep='\t', index_col=0)
