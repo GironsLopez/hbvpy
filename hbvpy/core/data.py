@@ -12,15 +12,13 @@ catchments. More specifically, it allows to process the following
 data types (products):
 
 * NetCDF :
-    TabsD, TmaxD, TminD, RhiresD, RdisaggH, SIS, SrelD (all from MeteoSwiss).
+    TabsD, TmaxD, TminD, RhiresD, RdisaggH (all from MeteoSwiss).
 * Raster :
     SWE (SLF), MOD10A1 (MODIS), DEM (swisstopo).
 * Shape :
     Basin shape (BAFU).
-* Point :
-    Relative humidity (MeteoSwiss), wind speed (MeteoSwiss).
 * Other :
-    Potential evapotranspiration, runoff (FOEN)
+    runoff (FOEN)
 
 .. author:: Marc Girons Lopez
 
@@ -50,8 +48,7 @@ gdal.UseExceptions()
 
 __all__ = [
         'BasinShape', 'Evap', 'DEM', 'HBVdata', 'MOD10A1', 'RdisaggH',
-        'RelativeHumidity', 'RhiresD', 'Runoff', 'SIS', 'SrelD', 'SWE',
-        'TabsD', 'TmaxD', 'TminD', 'WindSpeed']
+        'RhiresD', 'Runoff', 'SWE', 'TabsD', 'TmaxD', 'TminD']
 
 
 def remove_file(filename):
@@ -394,8 +391,9 @@ class NetCDF(object):
 
         return masked_data
 
-    def average(self, shp_fn=None, date_list=None, value_list=None,
-                start=None, end=None, touch_all=False):
+    def average(
+            self, shp_fn=None, date_list=None, value_list=None,
+            start=None, end=None, touch_all=False):
         """
         Calculate the average value for each time step.
 
@@ -950,8 +948,9 @@ class Raster(object):
                   xRes=gt[1], yRes=gt[5], outputBoundsSRS=ref_proj,
                   outputBounds=(xmin, ymin, xmax, ymax))
 
-    def lapse_rate(self, dem_fn, shp_fn=None, step=100,
-                   method='absolute', touch_all=False):
+    def lapse_rate(
+            self, dem_fn, shp_fn=None, step=100,
+            method='absolute', touch_all=False):
         """
         Calculate the lapse rate of the raster dataset with elevation.
 
@@ -1042,8 +1041,9 @@ class Shape(object):
 
         self.fn = filename
 
-    def rasterise(self, dst_nrows, dst_ncols, dst_gt,
-                  dst_proj, dst_fn=None, touch_all=False):
+    def rasterise(
+            self, dst_nrows, dst_ncols, dst_gt,
+            dst_proj, dst_fn=None, touch_all=False):
         """
         Convert a shapefile into a raster.
 
@@ -1194,354 +1194,6 @@ class Shape(object):
         return area
 
 
-class Point(object):
-    """
-    Methods to work with MeteoSwiss point data files.
-
-    Attributes
-    ----------
-    data_fn : str
-        Path and file name of the point data file object.
-    legend_fn : str
-        Path and file name of the legend file object.
-
-    """
-    # Variables
-    VAR = None       # Code of the data variable
-    VAR_NAME = None  # Name of the data variable
-
-    def __init__(self, data_fn, meta_fn):
-
-        self.data_fn = data_fn
-        self.meta_fn = meta_fn  # 'Legend' file
-
-    def load_data(self):
-        """
-        Load the MeteoSwiss point data file.
-
-        Returns
-        -------
-        data : Pandas.DataFrame
-            Data structure containing the point data.
-
-        """
-        src_ds = pd.read_csv(
-                self.data_fn, sep=';', header=0, usecols=[0, 1, 2],
-                infer_datetime_format=True, engine='python',
-                na_values=['-', ' ', 'stn', 'time', self.VAR],
-                dtype={'stn': str, 'time': dt.datetime, self.VAR: float})
-
-        data = src_ds.pivot_table(
-                values=self.VAR, index='time', columns='stn')
-
-        data.index = pd.to_datetime(data.index)
-
-        return data
-
-    @staticmethod
-    def _degmin2decdeg(degree, minute):
-        """
-        Convert degree minutes to decimal degrees.
-
-        Parameters
-        ----------
-        degree : int
-            Degree component.
-        minute : int
-            Minute component.
-
-        Returns
-        -------
-        float
-            Decimal degrees.
-
-        """
-        return degree + minute / 60
-
-    def load_meta(self):
-        """
-        Load the MeteoSwiss metadata (legend) file associated with the data
-        file.
-
-        Returns
-        -------
-        meta : Pandas.DataFrame
-            Data structure containing the necessary metadata.
-
-        """
-        meta = pd.read_fwf(
-                self.meta_fn, widths=[10, 37, 17, 51, 25, 17, 13],
-                index_col=0, skiprows=30, skipfooter=8)
-
-        # Separate the Longitude/Latitude column
-        meta['lon'], meta['lat'] = meta[
-                'Longitude/Latitude'].str.split('/', 1).str
-        meta.drop('Longitude/Latitude', 1, inplace=True)
-
-        # Separate the coordinates column
-        meta['chx'], meta['chy'] = meta[
-                'Coordinates [km]'].str.split('/', 1).str
-        meta.drop('Coordinates [km]', 1, inplace=True)
-
-        # Transofrm coordinates to numeric type
-        for col in ['chx', 'chy']:
-            meta[col] = pd.to_numeric(meta[col], downcast='integer')
-
-        # Transform lon/lat columns from deg min to decimal degrees
-        for col in ['lon', 'lat']:
-            board = []
-            for station in meta.index:
-                value = meta[col][station]
-                degree, minute = value.split('°')
-                # HACK: for some reason an 'Â' character appears before the
-                # degree symbol; remove it.
-                if 'Â' in degree:
-                    degree = degree.replace('Â', '')
-                minute = minute[:-1]  # drop the minute sign
-                board.append(self._degmin2decdeg(float(degree), float(minute)))
-            meta[col] = board
-            break
-
-        return meta
-
-    def write_shp(self, dst_fn, proj='wgs84'):
-        """
-        Write a point shapefile from the station coordinates metadata.
-
-        Parameters
-        ----------
-        dst_fn : str
-            Path and filename of the destination shapefile (*.shp)
-        proj : {'wgs84', 'swiss_cors'}, optional
-            Choose the projection of the output file, default is 'wgs84'
-
-        Raises
-        ------
-        ValueError
-            If the given projection is not supported.
-
-        """
-        # Set the projection information
-        if proj == 'wgs84':
-            dst_proj = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-            x_coor = 'lon'
-            y_coor = 'lat'
-
-        elif proj == 'swiss_cors':
-            dst_proj = '+proj=somerc +lat_0=46.95240555555556 '\
-                '+lon_0=7.439583333333333 +k_0=1 +x_0=600000 '\
-                '+y_0=200000 +ellps=bessel +towgs84=674.374,'\
-                '15.056,405.346,0,0,0,0 +units=m +no_defs'
-            x_coor = 'chx'
-            y_coor = 'chy'
-
-        else:
-            raise ValueError('Projection not supported.')
-
-        # Load the metadata containing the coordinates of the stations
-        meta = self.load_meta()
-
-        # Create driver
-        dst_driver = ogr.GetDriverByName('ESRI Shapefile')
-
-        # Create output data source
-        dst_ds = dst_driver.CreateDataSource(dst_fn)
-
-        # Set the output projection
-        dst_srs = osr.SpatialReference()
-        dst_srs.ImportFromProj4(dst_proj)
-
-        # Create layer
-        dst_lyr = dst_ds.CreateLayer('Stations', dst_srs, ogr.wkbPoint)
-
-        # Create station code field
-        stn_code = ogr.FieldDefn('Code', ogr.OFTString)
-        stn_code.SetWidth(10)
-        dst_lyr.CreateField(stn_code)
-
-        # Create elevation field
-        stn_elev = ogr.FieldDefn('Elevation', ogr.OFTInteger)
-        dst_lyr.CreateField(stn_elev)
-
-        for stn in meta.index:
-            feat = ogr.Feature(dst_lyr.GetLayerDefn())
-            feat.SetField('Code', stn)
-            feat.SetField('Elevation', int(meta['Elevation [m]'][stn]))
-
-            wkt = 'POINT(%f %f)' % (float(meta[x_coor][stn]),
-                                    float(meta[y_coor][stn]))
-
-            point = ogr.CreateGeometryFromWkt(wkt)
-
-            feat.SetGeometry(point)
-
-            dst_lyr.CreateFeature(feat)
-
-            del feat
-
-        del dst_ds
-
-    def stations_in_basin(self, shp_fn, min_stations=5):
-        """
-        Get the stations that are within (or closest to) a given basin.
-
-        Parameters
-        ----------
-        shp_fn : str
-            Path and filename of the basin shapefile delimiting the catchment.
-        min_stations : int, optional
-            Minimum number of stations to return, default is 5.
-
-        Returns
-        -------
-        stn_bsn : list
-            List of the available stations within the search radius.
-
-        """
-        # Load the metadata
-        meta = self.load_meta()
-
-        # Load the shapefile
-        driver = ogr.GetDriverByName('ESRI Shapefile')
-        shp_ds = driver.Open(shp_fn, gdal.GA_ReadOnly)
-        lyr = shp_ds.GetLayer()
-
-        # Get the geometry
-        feature = lyr.GetNextFeature()
-        polygon = feature.GetGeometryRef()
-
-        # Preallocate a list of stations within the basin
-        stn_bsn = []
-
-        # Loop over the stations and find those that are within the basin
-        for stn in meta.index:
-            point = ogr.Geometry(ogr.wkbPoint)
-            point.SetPoint(0, int(meta['chx'][stn]), int(meta['chy'][stn]))
-            if point.Within(polygon):
-                stn_bsn.append(stn)
-
-        # If the minimum number of stations to perform the averaging is not
-        # reached, search for the closest stations to the basin. Stop the
-        # search when the minimum number of the stations has been reached
-        search_radius = 5000  # m
-        while len(stn_bsn) < min_stations:
-            for stn in meta.index:
-                point = ogr.Geometry(ogr.wkbPoint)
-                point.SetPoint(0, int(meta['chx'][stn]), int(meta['chy'][stn]))
-                distance = point.Distance(polygon)
-                if distance < search_radius and stn not in stn_bsn:
-                    stn_bsn.append(stn)
-            search_radius += 5000
-
-        del shp_ds
-
-        return stn_bsn
-
-    def average_elevation(self, shp_fn, min_stations=5):
-        """
-        Calculate the average elevation of the relevant stations
-
-        Parameters
-        ----------
-        shp_fn : str
-            Path and filename of the basin shapefile delimiting the catchment.
-        min_stations : int, optional
-            Minimum number of stations to return, default is 5.
-
-        Returns
-        -------
-        float
-            Average elevation.
-
-        """
-        # Load the station metadata
-        meta = self.load_meta()
-
-        # Get the stations
-        stn_bsn = self.stations_in_basin(shp_fn, min_stations=min_stations)
-
-        # Preallocate a list to store station elevations
-        elevs = []
-
-        for stn in meta.index:
-            if stn in stn_bsn:
-                elevs.append(int(meta['Elevation [m]'][stn]))
-
-        return np.mean(elevs)
-
-    def _geometric_mean(self, df):
-        """
-        Calculate the geometric mean of an array excluding NaN values.
-
-        Parameters
-        ----------
-        df : Pandas.DataFrame
-            Data structure containing time series (index) of data from a
-            number of stations (columns).
-
-        Returns
-        -------
-        gm : Pandas.Series
-            Series containing the geometric mean for each time step.
-
-        """
-        # HACK: Set negative values to NaN (problem with RH)
-        df[df < 0] = np.nan
-
-        gm = pd.Series(data=None, index=df.index, name=self.VAR_NAME)
-
-        for date in df.index:
-            # Get the number of array elements that are not NaN
-            n = np.sum(~np.isnan(df.loc[date]))
-
-            if n == 0:
-                gm.loc[date] = np.nan
-
-            else:
-                # Get the product of the array elements that are not NaN
-                prod = np.nanprod(df.loc[date])
-
-                # Calculate the geometric mean
-                gm.loc[date] = np.power(prod, 1. / n)
-
-        return gm
-
-    def average(self, shp_fn=None, min_stations=5):
-        """
-        Calculate the geometric mean of the relevant point data.
-
-        Parameters
-        ----------
-        shp_fn : str, optional
-            Path and filename of the basin shapefile delimiting the catchment,
-            default is None.
-        min_stations : int, optional
-            Minimum number of stations to return, default is 5.
-
-        Returns
-        -------
-        Pandas.Series
-            Series containing the data average for every time step.
-
-        """
-        # Load the data and metadata
-        data = self.load_data()
-        meta = self.load_meta()
-
-        if shp_fn is not None:
-            # Find the stations within the basin
-            stn_bsn = self.stations_in_basin(
-                    shp_fn, min_stations=min_stations)
-
-            # Drop the irrelevant stations from the data file
-            for stn in meta.index:
-                if stn not in stn_bsn:
-                    data.drop(stn, axis=1, inplace=True)
-
-        # Calculate the geometric mean of the data
-        return self._geometric_mean(data)
-
-
 class TabsD(NetCDF):
     """
     Daily mean air temperature gridded dataset.
@@ -1659,77 +1311,6 @@ class RdisaggH(NetCDF):
             '15.056,405.346,0,0,0,0 +units=m +no_defs'
 
     RES = 1000  # metres
-
-    def __init__(self, filename):
-
-        super().__init__(filename)
-
-
-class SIS(NetCDF):
-    """
-    Surface incoming shortwave radiation gridded dataset.
-    Author: MeteoSwiss
-
-    Attributes
-    ----------
-    filename : str
-        Path and filename of the SIS NetCDF file.
-
-    """
-    LON = 'lon'
-    LAT = 'lat'
-
-    PROJ4 = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-
-    RES = 1.25 / 60  # Minutes to degrees
-
-    def __init__(self, filename):
-
-        super().__init__(filename)
-
-        # HACK: Correct MeteoSwiss datasets prior to 2014.
-        self._check_sis_var()
-
-    def _check_sis_var(self):
-        """
-        Check the name of the Surface Incoming Shortwave (SIS) radiation
-        variable. MeteoSwiss changed the name of the variable in 2014 from
-        "SIS" to "msg.SIS.D".
-
-        """
-        ds = Dataset(self.fn, 'r')
-
-        if 'msg.SIS.D' in ds.variables:
-            self.DATA = 'msg.SIS.D'
-
-        elif 'SIS' in ds.variables:
-            self.DATA = 'SIS'
-
-        else:
-            raise ValueError('The NetCDF file does not have a '
-                             'recognised data variable')
-
-        ds.close()
-
-
-class SrelD(NetCDF):
-    """
-    Daily relative sunshine duration gridded dataset.
-    Author: MeteoSwiss
-
-    Attributes
-    ----------
-    filename : str
-        Path and filename of the SrelD NetCDF file.
-
-    """
-    LON = 'lon'
-    LAT = 'lat'
-    DATA = 'SrelD'
-
-    PROJ4 = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-
-    RES = 1.25 / 60  # Minutes to degrees
 
     def __init__(self, filename):
 
@@ -2058,10 +1639,10 @@ class Evap(object):
         lat_rad = lat * (np.pi / 180)
 
         # Calculate the solar declination
-        dec = 0.409 * np.sin((2 * np.pi) / 365 * j - 1.39)
+        dec = 0.409 * np.sin(((2 * np.pi) / 365) * j - 1.39)
 
         # Calculate the inverse relative distance Earth-Sun
-        dr = 1 + 0.033 * np.cos((2 * np.pi) / 365 * j)
+        dr = 1 + 0.033 * np.cos(((2 * np.pi) / 365) * j)
 
         # Calculate the sunset hour angle
         sha = np.arccos(-np.tan(lat_rad) * np.tan(dec))
@@ -2196,48 +1777,6 @@ class Runoff(object):
 
         # HACK: Return the units removing the new string command ("\n")
         return units[:-1]
-
-
-class RelativeHumidity(Point):
-    """
-    Relative humidity
-    Author: MeteoSwiss
-
-    Attributes
-    ----------
-    data_fn : str
-        Path and file name of the point data file object.
-    legend_fn : str
-        Path and file name of the legend file object.
-
-    """
-    VAR = 'ure200d0'
-    VAR_NAME = 'RH'
-
-    def __init__(self, data_fn, meta_fn):
-
-        super().__init__(data_fn, meta_fn)
-
-
-class WindSpeed(Point):
-    """
-    Wind speed
-    Author: MeteoSwiss
-
-    Attributes
-    ----------
-    data_fn : str
-        Path and file name of the point data file object.
-    legend_fn : str
-        Path and file name of the legend file object.
-
-    """
-    VAR = 'fkl010d0'
-    VAR_NAME = 'u'
-
-    def __init__(self, data_fn, meta_fn):
-
-        super().__init__(data_fn, meta_fn)
 
 
 class BasinShape(object):
@@ -2522,6 +2061,8 @@ class HBVdata(object):
 
     """
     def __init__(self, bsn_dir):
+
+        self.bsn_dir = bsn_dir
 
         # The data files are stored in the 'Data' subfolder.
         self.data_dir = bsn_dir + '\\Data\\'
@@ -3275,220 +2816,13 @@ class HBVdata(object):
         clarea = DEM(dem_fn).elev_area_dist(
                 shp_fn=shp_fn, step=step, touch_all=touch_all)
 
-        HBVconfig.catchment_settings(
-                clarea, filename=self.data_dir+'Clarea.xml')
+        HBVconfig(self.bsn_dir).catchment_settings(clarea, filename=filename)
 
         return clarea
 
-    def generate_sis(
-            self, sis_dir, shp_fn, start=None, end=None,
-            touch_all=False, filename='SIS.txt'):
-        """
-        Generate a SIS.txt file.
-
-        Parameters
-        ----------
-        sis_dir : str
-            Directory where the sis data is stored.
-        shp_fn : str
-            Path and filename of the basin shapefile delimiting the catchment.
-        start : '%Y-%m-%d', optional
-            Start date of the output dataset, default is None.
-        end : '%Y-%m-%d', optional
-            End date of the outpout dataset, default is None.
-        touch_all : bool, optional
-            May be set to True to set all pixels touched by the line or
-            polygons, not just those whose center is within the polygon or
-            that are selected by brezenhams line algorithm, default is False.
-        filename : str
-            Name of the SIS file, default is 'SIS.txt'.
-
-        Returns
-        -------
-        Pandas.Series
-            Pandas Series containing the SIS data for the catchment.
-
-        """
-        print('...' + filename)
-
-        # Preallocate space to store dates and sis data.
-        dates = []
-        vals = []
-
-        for file in glob.glob(sis_dir + '*.nc'):
-            # Loop over the sis NetCDF files in the directory.
-
-            # Create an instance of the SIS class.
-            rad = SIS(file)
-
-            # Get the average sis over the catchment
-            dates, vals = rad.average(
-                    shp_fn=shp_fn, date_list=dates, value_list=vals,
-                    start=start, end=end, touch_all=touch_all)
-
-        # Store the data in a Pandas.Series object.
-        sis = pd.Series(data=vals, index=dates, name='SIS')
-
-        # Re-index the data
-        if start is not None or end is not None:
-            date_index = pd.date_range(start=start, end=end, freq='D')
-            sis = sis.reindex(date_index)
-
-        # Interpolate eventual missing data
-        sis.interpolate(method='cubic', inplace=True)
-
-        # Filter potential negative sis values
-        sis[sis < 0] = 0
-
-        # Round the values to 3 decimals.
-        sis = sis.round(decimals=3)
-
-        self._write_txt(sis, filename, idx=True, header=None)
-
-        # Return a Pandas.Series object containing the sis data
-        return sis
-
-    def generate_rh(
-            self, rh_data_fn, rh_meta_fn, shp_fn, min_stations=5,
-            start=None, end=None, filename='RH.txt'):
-        """
-        Generaet a RH.txt file.
-
-        Parameters
-        ----------
-        rh_data_fn : str
-            Path and filename of the relative humidity data file.
-        rh_meta_fn : str
-            Path and filename of the relative humidity metadata file.
-        shp_fn : str
-            Path and filename of the basin shapefile delimiting the catchment.
-        min_stations : int, optional
-            Minimum number the stations to calculate the average RH,
-            default is 5.
-        start : '%Y-%m-%d', optional
-            Start date of the output dataset, default is None.
-        end : '%Y-%m-%d', optional
-            End date of the outpout dataset, default is None.
-        filename : str
-            Name of the RH file, default is 'RH.txt'.
-
-        Returns
-        -------
-        Pandas.Series
-            Pandas Series containing the RH data for the catchment.
-
-        """
-        print('...' + filename)
-
-        # Get the average relative humidity over the catchment
-        data = RelativeHumidity(rh_data_fn, rh_meta_fn)
-        rh = data.average(shp_fn=shp_fn, min_stations=min_stations)
-
-        # Re-index the data
-        if start is not None or end is not None:
-            date_index = pd.date_range(start=start, end=end, freq='D')
-            rh = rh.reindex(date_index)
-
-        # Interpolate eventual missing data
-        rh.interpolate(method='cubic', inplace=True)
-
-        # Filter potential out-of-range values
-        rh[rh < 0] = 0
-        rh[rh > 100] = 100
-
-        # Round the values to 3 decimals.
-        rh = rh.round(decimals=3)
-
-        self._write_txt(rh, filename, idx=True, header=None)
-
-        return rh
-
-    def generate_u(
-            self, u_data_fn, u_meta_fn, shp_fn, min_stations=5,
-            start=None, end=None, filename='U.txt'):
-        """
-        Generaet a U.txt file.
-
-        Parameters
-        ----------
-        u_data_fn : str
-            Path and filename of the wind speed data file.
-        u_meta_fn : str
-            Path and filename of the wind speed metadata file.
-        shp_fn : str
-            Path and filename of the basin shapefile delimiting the catchment.
-        min_stations : int, optional
-            Minimum number the stations to calculate the average U,
-            default is 5.
-        start : '%Y-%m-%d', optional
-            Start date of the output dataset, default is None.
-        end : '%Y-%m-%d', optional
-            End date of the outpout dataset, default is None.
-        filename : str
-            Name of the U file, default is 'U.txt'.
-
-        Returns
-        -------
-        Pandas.Series
-            Pandas Series containing the RH data for the catchment.
-
-        """
-        print('...' + filename)
-
-        # Get the average relative humidity over the catchment
-        data = WindSpeed(u_data_fn, u_meta_fn)
-        u = data.average(shp_fn=shp_fn, min_stations=min_stations)
-
-        # Re-index the data
-        if start is not None or end is not None:
-            date_index = pd.date_range(start=start, end=end, freq='D')
-            u = u.reindex(date_index)
-
-        # Interpolate eventual missing data
-        u.interpolate(method='cubic', inplace=True)
-
-        # Filter potential negative wind speed values
-        u[u < 0] = 0
-
-        # Round the values to 3 decimals.
-        u = u.round(decimals=3)
-
-        self._write_txt(u, filename, idx=True, header=None)
-
-        return u
-
-    @staticmethod
-    def elevation_class(mean_elevation):
-        """
-        Define an elevation class given the mean elevation of a ctachment.
-
-        Parameters
-        ----------
-        mean_elevation : float
-            Mean elevation of the catchment.
-
-        Returns
-        -------
-        int
-            Elevation class.
-
-        """
-        if mean_elevation < 1000:
-            return 1
-
-        elif mean_elevation >= 1000 and mean_elevation < 2000:
-            return 2
-
-        elif mean_elevation >= 2000 and mean_elevation < 3000:
-            return 3
-
-        else:
-            return 4
-
     def generate_metadata(
-            self, precip_dir, temp_dir, dem_fn, rh_data_fn, rh_meta_fn,
-            u_data_fn, u_meta_fn, shp_fn, stn_code, area_calc='shape',
-            touch_all=False, filename='metadata.txt'):
+            self, precip_dir, temp_dir, dem_fn, shp_fn, stn_code,
+            area_calc='shape', touch_all=False, filename='metadata.txt'):
         """
         Generate a metadata file for the given catchment.
 
@@ -3497,9 +2831,7 @@ class HBVdata(object):
             - FOEN station name
             - Latitude and longitude of the catchment centroid
             - Average elevation of the precipitation and temperature data
-            - Average elevation of the relative humidity and wind speed data
             - Average, maximum, and minimum catchment elevation
-            - Elevation class of the catchment
             - Catchment area
 
         Parameters
@@ -3510,14 +2842,6 @@ class HBVdata(object):
             Directory where the temperature data is stored.
         dem_fn : str
             Path and filename of the DEM file to get the elevation data from.
-        rh_data_fn : str
-            Path and filename of the relative humidity data file.
-        rh_meta_fn : str
-            Path and filename of the relative humidity metadata file.
-        u_data_fn : str
-            Path and filename of the wind speed data file.
-        u_meta_fn : str
-            Path and filename of the wind speed metadata file.
         shp_fn : str
             Path and filename of the basin shapefile delimiting the catchment.
         stn_code : int
@@ -3569,22 +2893,11 @@ class HBVdata(object):
         meta['Telev'] = TabsD(t_file).mean_elev(
                 dem_fn, shp_fn=shp_fn, touch_all=touch_all)
 
-        # Get the average elevation of the relative humidity data
-        rh = RelativeHumidity(rh_data_fn, rh_meta_fn)
-        meta['RHelev'] = rh.average_elevation(shp_fn, min_stations=5)
-
-        # Get the average elevation of the wind speed data
-        u = WindSpeed(u_data_fn, u_meta_fn)
-        meta['Uelev'] = u.average_elevation(shp_fn, min_stations=5)
-
         # Get the minimum, mean, and maximum elevation of the catchment
         meta['Zmin'] = np.nanmin(dem)
         meta['Zavg'] = np.nanmean(dem)
         meta['Zmax'] = np.nanmax(dem)
         # TODO: Calculate catchment slope.
-
-        # Determine the elevation class for the catchment
-        meta['Class'] = self.elevation_class(np.nanmean(dem))
 
         # Get the area of the catchment (in km2)
         if area_calc == 'shape':
@@ -3604,10 +2917,9 @@ class HBVdata(object):
         return meta
 
     def generate_input_data(
-            self, precip_dir, temp_dir, q_dir, swe_dir, sc_dir, sis_dir,
-            dem_fn, rh_data_fn, rh_meta_fn, u_data_fn, u_meta_fn, stn_code,
-            start=None, end=None, elev_step=100, t_mean_freq='month',
-            touch_all=False):
+            self, precip_dir, temp_dir, q_dir, swe_dir, sc_dir, dem_fn,
+            stn_code, start=None, end=None, elev_step=100,
+            t_mean_freq='month', touch_all=False):
         """
         Generate the necessary input data to run HBV-light.
 
@@ -3625,18 +2937,8 @@ class HBVdata(object):
             Directory where the snow water equivalent data is stored.
         sc_dir : str
             Directory where the snow cover fraction data is stored.
-        sis_dir : str
-            Directory where the sis data is stored.
         dem_fn : str
             Path and filename of the DEM file to get the elevation data from.
-        rh_data_fn : str
-            Path and filename of the relative humidity data file.
-        rh_meta_fn : str
-            Path and filename of the relative humidity metadata file.
-        u_data_fn : str
-            Path and filename of the wind speed data file.
-        u_meta_fn : str
-            Path and filename of the wind speed metadata file.
         stn_code : int
             Identification code of the BAFU hydrometric station defining
             the catchment.
@@ -3672,24 +2974,10 @@ class HBVdata(object):
                 start=start, end=end, pcalt=True, tcalt=True,
                 touch_all=touch_all)
 
-        self.generate_ptcalt(
-                precip_dir, temp_dir, dem_fn, shp_fn, stn_code,
-                start=start, end=end, pcalt=True, tcalt=False,
-                touch_all=touch_all, filename='PCALT.txt')
-
-        self.generate_ptcalt(
-                precip_dir, temp_dir, dem_fn, shp_fn, stn_code,
-                start=start, end=end, pcalt=False, tcalt=True,
-                touch_all=touch_all, filename='TCALT.txt')
-
         # Generate the ObsSWE.txt file
         self.generate_swe(
                 swe_dir, dem_fn, shp_fn, output='elev_dist', step=elev_step,
                 start=start, end=end, touch_all=touch_all)
-
-        self.generate_swe(
-                swe_dir, dem_fn, shp_fn, output='average', start=start,
-                end=end, touch_all=touch_all, filename='avgSWE.txt')
 
         # Generate the SnowCover.txt file
         self.generate_snow_cover(
@@ -3708,20 +2996,10 @@ class HBVdata(object):
         self.generate_clarea(
                 dem_fn, shp_fn=shp_fn, step=elev_step, touch_all=touch_all)
 
-        # Generate the SIS.txt file
-        self.generate_sis(
-                sis_dir, shp_fn, start=start, end=end, touch_all=touch_all)
-
-        # Generate the RH.txt file
-        self.generate_rh(rh_data_fn, rh_meta_fn, shp_fn, start=start, end=end)
-
-        # Generate the U.txt file
-        self.generate_u(u_data_fn, u_meta_fn, shp_fn, start=start, end=end)
-
         # Generate a metadata.txt file
         self.generate_metadata(
-                precip_dir, temp_dir, dem_fn, rh_data_fn, rh_meta_fn,
-                u_data_fn, u_meta_fn, shp_fn, stn_code, touch_all=touch_all)
+                precip_dir, temp_dir, dem_fn, shp_fn,
+                stn_code, touch_all=touch_all)
 
         # Remove temporary files
         for file in glob.glob(self.data_dir + 'basin*'):
@@ -3759,13 +3037,13 @@ class HBVdata(object):
         if not os.path.exists(filepath):
             raise ValueError('The file does not exist.')
 
-        if filename == 'PTQ.txt':
+        if filename.lower() == 'ptq.txt':
             board = pd.read_csv(
                     filepath, sep='\t', na_values=no_data, index_col=0,
                     parse_dates=True, skiprows=1, infer_datetime_format=True)
             board.index.rename('Date', inplace=True)
 
-        elif filename in ['EVAP.txt', 'T_mean.txt']:
+        elif filename.lower() in ['evap.txt', 't_mean.txt']:
             board = pd.read_csv(filepath)
             if len(board.index) == 12:
                 board['Month'] = np.arange(1, 13)
@@ -3774,13 +3052,13 @@ class HBVdata(object):
                 board['Day'] = np.arange(1, 366)
                 board.set_index('Day', inplace=True)
 
-        elif filename == ' PTCALT.txt':
+        elif filename.lower() == ' ptcalt.txt':
             board = pd.read_csv(
                     filepath, sep='\t', index_col=0, parse_dates=True,
                     skiprows=1, infer_datetime_format=True, squeeze=True)
             board.index.rename('Date', inplace=True)
 
-        elif filename in ['SnowCover.txt', 'ObsSWE.txt']:
+        elif filename.lower() in ['snowcover.txt', 'obsswe.txt']:
             board = pd.read_csv(
                     filepath, sep='\t', index_col=0, parse_dates=True,
                     na_values=no_data, infer_datetime_format=True,
@@ -3791,3 +3069,32 @@ class HBVdata(object):
             raise ValueError('The specified filename is not recognised.')
 
         return board
+
+
+def load_metadata(catchments_dir):
+    """
+    Load the metadata of all catchments in a given directory.
+
+    Parameters
+    ----------
+    catchments_dir : str
+        Path of the directory where the catchment folders are stored.
+
+    Returns
+    -------
+    metadata : Pandas.DataFrame
+        Data structure containing the metadata for all catchments in the
+        given directory.
+
+    """
+    metadata = pd.DataFrame()
+
+    for root, dirs, files in os.walk(catchments_dir):
+        for file in files:
+            filename = os.path.join(root, file)
+            if file == 'metadata.txt':
+                meta = pd.read_csv(
+                        filename, sep='\t', engine='python', index_col=0)
+                metadata = pd.concat([metadata, meta], axis=0)
+
+    return metadata

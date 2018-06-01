@@ -17,6 +17,8 @@ BatchRun, GAPRun).
 import os
 import pandas as pd
 
+from . import HBVdata
+
 
 __all__ = ['BatchRun', 'GAPRun', 'MonteCarlo', 'SingleRun']
 
@@ -252,7 +254,7 @@ class GAPRun(object):
         Parameters
         ----------
         results_folder : str, optional
-            Name of the results folder, default is 'Results'.
+            Name of the GAP results folder, default is 'Results'.
 
         Returns
         -------
@@ -300,7 +302,8 @@ class BatchRun(object):
         Parameters
         ----------
         results_folder : str, optional
-            Name of the results folder, default is 'Results'.
+            Name of the Batch Run results folder,
+            default is 'Results'.
         sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
@@ -340,7 +343,7 @@ class BatchRun(object):
         Parameters
         ----------
         results_folder : str, optional
-            Name of the results folder, default is 'Results'.
+            Name of the Batch Run results folder, default is 'Results'.
         data : {'rows', 'columns'}, optional
             Organisation of the data in the results file.
         sc : int, optional
@@ -424,7 +427,7 @@ class BatchRun(object):
         Parameters
         ----------
         results_folder : str, optional
-            Name of the results folder, default is 'Results'.
+            Name of the Batch Run results folder, default is 'Results'.
         sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
@@ -459,7 +462,7 @@ class BatchRun(object):
                 filepath, sep='\t', parse_dates=True,
                 index_col=0, infer_datetime_format=True)
 
-    def load_runoff_comp(
+    def load_runoff_component(
             self, results_folder='Results', component='Snow', sc=None):
         """
         Load the time series of a given runoff component from a batch
@@ -468,7 +471,7 @@ class BatchRun(object):
         Parameters
         ----------
         results_folder : str, optional
-            Name of the results folder, default is 'Results'.
+            Name of the Batch Run results folder, default is 'Results'.
         component : {'Rain', 'Snow', 'Glacier', 'Q0', 'Q1', 'Q2'}
             Name of the runoff component to load, default 'Snow'.
         sc : int, optional
@@ -534,7 +537,7 @@ class BatchRun(object):
         Parameters
         ----------
         results_folder : str, optional
-            Name of the results folder, default is 'Results'.
+            Name of the Batch Run results folder, default is 'Results'.
         sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.
@@ -567,6 +570,124 @@ class BatchRun(object):
         # Load the monthly runoff file.
         return pd.read_csv(filepath, sep='\t')
 
+    def load_swe(self, results_folder='Results'):
+        """
+        Load the time series of simulated snow water equivalent for each
+        elevation band and parameter set used for a batch HBV-light run.
+
+        NOTE: This method ONLY works if no additional precipitaiton,
+        temperature, or evaporation series are provided.
+
+        Parameters
+        ----------
+        results_folder : str, optional
+            Name of the Batch Run results folder, default is 'Results'.
+
+        Returns
+        -------
+        swe : Pandas.DataFrame
+            Data structure containing the simulated snow water equivalent
+            data for each elevation band and parameter set.
+
+        Raises
+        ------
+        ValueError
+            If the specifed file does not exist.
+
+        """
+        # Set the results folder path.
+        path = self.bsn_dir + '\\' + results_folder + '\\'
+
+        # Set the snow water equivalent filename.
+        filepath = path + 'Simulated_SWE.txt.'
+
+        # Check if the snow water equivalent file exists.
+        if not os.path.exists(filepath):
+            raise ValueError('The file does not exist.')
+
+        # Parse the raw data
+        raw_data = pd.read_csv(filepath, sep='\t')
+
+        # Get the number of parameter sets
+        param_sets = raw_data['Parameterset'].unique()
+
+        # Initialise a dict to write the SWE data
+        swe = {ps: None for ps in param_sets}
+
+        # Parse the data
+        for ps in param_sets:
+            data_tmp = raw_data[raw_data['Parameterset'] == ps]
+            data_tmp.set_index('SWE serie', drop=True, inplace=True)
+            data = data_tmp.drop(
+                    ['Parameterset', 'Prec. serie',
+                     'Temp. serie', 'Evap. serie'], axis=1).transpose()
+            data.index = pd.to_datetime(data.index, format='%Y%m%d')
+
+            swe[ps] = data
+
+        return swe
+
+    def calculate_swe_stats(self, results_folder, clarea=None):
+        """
+        Calculate the catchment-wide statistics of snow water equivalent
+        taking into account all elevation bands and parameter sets used in
+        batch HBV-light run.
+
+        This method provides median and mean catchment snow water equivalent,
+        in addition to the 10th and 90th percentiles.
+
+        Parameters
+        ----------
+        results_folder : str
+            Name of the Batch Run results folder.
+        clarea : str, optional
+            Custom name for the 'Clarea.xml' file. If no value is provided
+            the default file name is used, default is None.
+
+        Returns
+        -------
+        sim_swe : Pandas.Series
+            Data structure containing the simulated catchment avverage
+            snow water equivalent for each time step.
+
+        """
+        # Instatiate the HBVdata class
+        hbv_data = HBVdata(self.bsn_dir)
+
+        # Use the default elevation distribution file name if no name is
+        # specified.
+        if clarea is None:
+            clarea = 'Clarea.xml'
+
+        # Check if the elevation distribution file exists.
+        if not os.path.exists(hbv_data.data_dir + clarea):
+            raise ValueError('The Clarea.xml file does not exist.')
+
+        # Load the area fraction of each elevation band in the catchment.
+        elev_dist = hbv_data.load_elev_dist(filename=clarea)
+
+        # Load the distributed simulated snow water equivalent.
+        dist_swe = self.load_swe(results_folder)
+
+        # Calculate the catchment average snow water equivalent for
+        # each of the parameter sets.
+        avg_swe = pd.DataFrame()
+        for p_set in dist_swe.keys():
+            for i, col in enumerate(dist_swe[p_set].columns):
+                area = elev_dist.iloc[i]
+                dist_swe[p_set][col] = dist_swe[p_set][col] * area
+            avg_swe[p_set] = dist_swe[p_set].sum(axis=1)
+
+        # Calculate the snow water equivalent statistics:
+        # median, mean, 10p, and 90p
+        swe_stats = pd.DataFrame()
+        swe_stats['SWEmedian'] = avg_swe.median(axis=1)
+        swe_stats['SWEmean'] = avg_swe.mean(axis=1)
+        swe_stats['SWEp10'] = avg_swe.quantile(q=0.1, axis=1)
+        swe_stats['SWEp90'] = avg_swe.quantile(q=0.9, axis=1)
+
+        return swe_stats
+
     def calculate_runoff_quantile(
             self, results_folder='Results', data='Columns', quantile=0.5):
         """
@@ -579,7 +700,7 @@ class BatchRun(object):
         Parameters
         ----------
         results_folder : str, optional
-            Name of the results folder, default is 'Results'.
+            Name of the Batch Run results folder, default is 'Results'.
         data : {'rows', 'columns'}, optional
             Organisation of the data in the results file.
         quantile : float, optional
@@ -623,7 +744,7 @@ class MonteCarlo(object):
         Parameters
         ----------
         results_folder : str, optional
-            Name of the results folder, default is 'Results'.
+            Name of the MC Run results folder, default is 'Results'.
         sc : int, optional
             Sub-catchment number, in case there are more than one
             sub-catchments, default is None.

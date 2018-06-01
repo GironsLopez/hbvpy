@@ -6,7 +6,7 @@ hbvpy.config
 
 **A package to generate xml configuration files needed to run HBV-light.**
 
-This package is intended to provide functions and method to generate
+This package is intended to provide functions and methods to generate
 the necessary configuration files to run HBV-light. More specifically, it
 allows to generate the following files:
 
@@ -407,7 +407,7 @@ class HBVconfig(object):
         """
         # Define the catchment and vegetation zone parameters
         # ---------------------------------------------------------------------
-        # Catchments parameters
+        # Catchment parameters
         if cps is None:
             cps = {'KSI': 0, 'KGmin': 0, 'RangeKG': 0, 'AG': 0, 'PERC': 1,
                    'Alpha': 0, 'UZL': 30, 'K0': 0.25, 'K1': 0.1, 'K2': 0.01,
@@ -474,14 +474,22 @@ class HBVconfig(object):
 
         """
         # Set the appropriate format for the given time step.
+        # ---------------------------------------------------------------------
         if time_step == 'day':
             ts = 'd'
+
         elif time_step == 'hour':
             ts = 'h'
+
         else:
             raise ValueError('Time step not recognised.')
 
         # Set the appropriate unit for the given HBV-light parameter.
+        # ---------------------------------------------------------------------
+
+        # Set the unicode for the degree sign
+        degree_sign = u'\N{DEGREE SIGN}'
+
         if param_name in ['KSI', 'KGmin', 'RangeKG', 'K0', 'K1', 'K2']:
             return '1/' + ts
 
@@ -493,10 +501,10 @@ class HBVconfig(object):
             return 'mm'
 
         elif param_name == 'TT':
-            return '°C'
+            return degree_sign + 'C'
 
         elif param_name == 'CFMAX':
-            return 'mm/' + ts + ' °C'
+            return 'mm/' + ts + ' ' + degree_sign + 'C'
 
         elif param_name in ['Pelev', 'Telev']:
             return 'm'
@@ -505,10 +513,10 @@ class HBVconfig(object):
             return '%/100m'
 
         elif param_name == 'TCALT':
-            return '°C/100m'
+            return degree_sign + 'C/100m'
 
         elif param_name == 'Cet':
-            return '1/°C'
+            return '1/' + degree_sign + 'C'
 
         elif param_name in ['MAXBAS', 'DELAY']:
             return ts
@@ -546,6 +554,34 @@ class HBVconfig(object):
 
         else:
             return param_name
+
+    @staticmethod
+    def objective_function_name(obj_function):
+        """
+        Set the HBV-light name for a given objective function.
+
+        Parameters
+        ----------
+        obj_fun : str
+            Name of the objective function used in the analysis.
+
+        Returns
+        -------
+        str
+            Name of the objective function according to HBV-light.
+
+        """
+        if obj_function not in [
+                'Reff', 'ReffWeighted', 'LogReff', 'R2', 'MeanDiff',
+                'VolumeError', 'LindstromMeasure', 'MAREMeasure',
+                'FlowWeightedReff', 'ReffInterval(i)', 'ReffSeason',
+                'ReffPeak', 'SpearmanRank', 'ReffQObsSample',
+                'SnowCover_RMSE', 'GW_Rspear', 'Glacier_MAE',
+                'SWE_Reff', 'SWE_MANE', 'F_time', 'F_flow']:
+            return 'PythonScript'
+
+        else:
+            return obj_function
 
     def gap_settings(
             self, catchment_params, veg_zone_params,
@@ -714,11 +750,10 @@ class HBVconfig(object):
         self._write(root, self.data_dir + filename)
 
     def mc_settings(
-            self, catchment_params, veg_zone_params,
-            filename='MC_Simulation.xml', time_step='day',
-            gap_folder=None, eff_measure=None, multi_periods=False,
-            periods=None, runs=1000, save_runs='SaveAll', min_reff_val=0.6,
-            gaussian=False, obj_functions=None):
+            self, catchment_params, veg_zone_params, gap_folder=None,
+            eff_measure=None, filename='MC_Simulation.xml', time_step='day',
+            multi_periods=False, periods=None, runs=1000, save_runs='SaveAll',
+            min_reff_val=0.6, gaussian=False, obj_functions=None):
         """
         Generate an XML configuration file for the Monte Carlo Simulation
         function of HBV-light.
@@ -1098,7 +1133,7 @@ class HBVconfig(object):
         ----------
         filename : str, optional
             Name for the catchment settings file.'Clarea.xml' file,
-            default is Clarea.xml'.
+            default is 'Clarea.xml'.
 
         Returns
         -------

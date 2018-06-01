@@ -40,13 +40,15 @@ class HBV(object):
     def __init__(self, hbv_path=None):
 
         if hbv_path is None:
-            self.hbv_path = 'C:\\Program Files (x86)\\HBV-light\\HBV-light-CLI.exe'
+            self.hbv_path = (
+                'C:\\Program Files (x86)\\HBV-light\\HBV-light-CLI.exe')
 
         else:
             self.hbv_path = hbv_path
 
         if not os.path.exists(self.hbv_path):
-            raise ValueError('The specified HBV-ligh-CLI.exe file does not exist.')
+            raise ValueError(
+                'The specified HBV-ligh-CLI.exe file does not exist.')
 
 
 class HBVscenario(HBV):
@@ -105,6 +107,12 @@ class HBVscenario(HBV):
         Summary output file, default is 'Summary.txt'.
     g : str, optional
         Glacier profile file, default is 'GlacierProfile.txt'.
+    swe : str, optional
+        File with snow water equivalent data, default is 'ObsSWE.txt'.
+    snowcover . str, optional
+        File with snow cover data, default is 'SnowCover.txt'.
+    python : str, optional
+        Python objective function file, default is 'ObjFunc.py'.
 
     """
 
@@ -115,7 +123,8 @@ class HBVscenario(HBV):
             b='Batch.txt', ps='P_series.txt', ts='T_series.txt',
             es='EVAP_series.txt', bs='Batch_Simulation.txt',
             mcs='MC_Simulation.txt', gaps='GAP_Simulation.txt',
-            results='Results', summary='Summary.txt', g='GlacierProfile.txt'):
+            results='Results', summary='Summary.txt', g='GlacierProfile.txt',
+            swe='ObsSWE.txt', snowcover='SnowCover.txt', python='ObjFunc.py'):
 
         super().__init__(hbv_path)
 
@@ -125,7 +134,8 @@ class HBVscenario(HBV):
                 'c': c, 'p': p, 's': s, 'ptq': ptq, 'evap': evap,
                 'tmean': tmean, 'ptcalt': ptcalt, 'sc': sc, 'b': b, 'ps': ps,
                 'ts': ts, 'es': es, 'bs': bs, 'mcs': mcs, 'gaps': gaps,
-                'summary': summary, 'g': g}
+                'summary': summary, 'g': g, 'swe': swe, 'snowcover': snowcover,
+                'python': python}
 
 
 class HBVcatchment(HBVscenario):
@@ -227,7 +237,7 @@ class HBVcatchment(HBVscenario):
                 p.show_progress()
                 print
 
-    def run_hbv(self, sim_type, period=None, debug_mode=False):
+    def run(self, sim_type, debug_mode=False):
         """
         Run HBV-light.
 
@@ -239,8 +249,6 @@ class HBVcatchment(HBVscenario):
         ----------
         sim_type : {'SingleRun', 'MonteCarloRun', 'BatchRun', 'GAPRun'}
             Simulation type.
-        period : str, optional
-            Period for which the model is being run, default is None.
         debug_mode : bool, optional
             If False a progress bar is shown,  otherwise the standard
             HBV-light output is shown, default is False.
