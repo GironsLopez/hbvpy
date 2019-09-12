@@ -16,7 +16,7 @@ data types (products):
 * Raster :
     SWE (SLF), MOD10A1 (MODIS), DEM (swisstopo).
 * Shape :
-    Basin shape (BAFU).
+    Basin shape (FOEN).
 * Other :
     runoff (FOEN)
 
@@ -40,7 +40,7 @@ from urllib.request import urlopen
 from scipy.stats import linregress
 
 from . import HBVconfig
-from hbvpy_dev.ThirdParty import ncdump
+from hbvpy.ThirdParty import ncdump
 
 
 gdal.UseExceptions()

@@ -16,10 +16,10 @@ HBV-light so the model can be run from a python script.
 import os
 import subprocess
 
-from hbvpy_dev.ThirdParty import AnimatedProgressBar
+from hbvpy.ThirdParty import AnimatedProgressBar
 
 
-__all__ = ['HBVcatchment', 'HBVscenario']
+__all__ = ['HBVcatchment', 'HBVsimulation']
 
 
 class HBV(object):
@@ -51,12 +51,12 @@ class HBV(object):
                 'The specified HBV-ligh-CLI.exe file does not exist.')
 
 
-class HBVscenario(HBV):
+class HBVsimulation(HBV):
     """
-    HBV-light scenario.
+    HBV-light simulation setup.
 
     This class defines the input data and configuration files for setting up
-    a particular simulation scenario.
+    a particular simulation setup.
 
     HBV-light will search for the default files in the data directory and use
     them if they are present. If the user decides not to use a specific file
@@ -138,7 +138,7 @@ class HBVscenario(HBV):
                 'python': python}
 
 
-class HBVcatchment(HBVscenario):
+class HBVcatchment(HBVsimulation):
     """
     HBV-light catchment.
 
@@ -149,14 +149,14 @@ class HBVcatchment(HBVscenario):
     ----------
     bsn_dir : str
         Path to the basin folder (containing a 'Data' sub-folder).
-    scenario : hbvpy.model.Scenario instance
-        Predefined scenario to run HBV-light for the chosen catchment.
+    simulation : hbvpy.model.Scenario instance
+        Predefined HBV-light simulation setup to run for the chosen catchment.
 
     """
-    def __init__(self, bsn_dir, scenario):
+    def __init__(self, bsn_dir, simulation):
         """
         """
-        self.__scenario = scenario
+        self.__simulation = simulation
 
         self.bsn_dir = bsn_dir
 
@@ -168,15 +168,15 @@ class HBVcatchment(HBVscenario):
     def __getattr__(self, attr):
         """
         """
-        return getattr(self.__scenario, attr)
+        return getattr(self.__simulation, attr)
 
     def __setattr__(self, attr, val):
         """
         """
-        if attr == '_HBVcatchment__scenario':
+        if attr == '_HBVcatchment__simulation':
             object.__setattr__(self, attr, val)
 
-        return setattr(self.__scenario, attr, val)
+        return setattr(self.__simulation, attr, val)
 
     def _parse_files(self, command):
         """
@@ -250,7 +250,7 @@ class HBVcatchment(HBVscenario):
         sim_type : {'SingleRun', 'MonteCarloRun', 'BatchRun', 'GAPRun'}
             Simulation type.
         debug_mode : bool, optional
-            If False a progress bar is shown,  otherwise the standard
+            If False a progress bar is shown, otherwise the standard
             HBV-light output is shown, default is False.
 
         """
