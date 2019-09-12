@@ -16,7 +16,7 @@ data types (products):
 * Raster :
     SWE (SLF), MOD10A1 (MODIS), DEM (swisstopo).
 * Shape :
-    Basin shape (BAFU).
+    Basin shape (FOEN).
 * Other :
     runoff (FOEN)
 
