@@ -20,7 +20,7 @@ import pandas as pd
 from . import HBVdata
 
 
-__all__ = ['BatchRun', 'GAPRun', 'MonteCarlo', 'SingleRun']
+__all__ = ['BatchRun', 'GAPRun', 'MonteCarloRun', 'SingleRun']
 
 
 class SingleRun(object):
@@ -723,7 +723,7 @@ class BatchRun(object):
         return runoff.quantile(quantile, axis=1)
 
 
-class MonteCarlo(object):
+class MonteCarloRun(object):
     """
     Process results from HBV-light Monte Carlo simulations.
 
