@@ -40,7 +40,7 @@ from urllib.request import urlopen
 from scipy.stats import linregress
 
 from . import HBVconfig
-from hbvpy_dev.ThirdParty import ncdump
+from hbvpy.ThirdParty import ncdump
 
 
 gdal.UseExceptions()
