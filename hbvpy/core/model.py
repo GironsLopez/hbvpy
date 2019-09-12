@@ -16,7 +16,7 @@ HBV-light so the model can be run from a python script.
 import os
 import subprocess
 
-from hbvpy.ThirdParty import AnimatedProgressBar
+from hbvpy_dev.ThirdParty import AnimatedProgressBar
 
 
 __all__ = ['HBVcatchment', 'HBVscenario']
