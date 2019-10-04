@@ -17,7 +17,7 @@ BatchRun, GAPRun).
 import os
 import pandas as pd
 
-from . import HBVdata
+from . import HBVconfig
 
 
 __all__ = ['BatchRun', 'GAPRun', 'MonteCarloRun', 'SingleRun']
@@ -651,8 +651,8 @@ class BatchRun(object):
             snow water equivalent for each time step.
 
         """
-        # Instatiate the HBVdata class
-        hbv_data = HBVdata(self.bsn_dir)
+        # Instatiate the HBVconfig class
+        hbv_config = HBVconfig(self.bsn_dir)
 
         # Use the default elevation distribution file name if no name is
         # specified.
@@ -660,11 +660,11 @@ class BatchRun(object):
             clarea = 'Clarea.xml'
 
         # Check if the elevation distribution file exists.
-        if not os.path.exists(hbv_data.data_dir + clarea):
+        if not os.path.exists(hbv_config.data_dir + clarea):
             raise ValueError('The Clarea.xml file does not exist.')
 
         # Load the area fraction of each elevation band in the catchment.
-        elev_dist = hbv_data.load_elev_dist(filename=clarea)
+        elev_dist = hbv_config.load_catchment_settings(filename=clarea)
 
         # Load the distributed simulated snow water equivalent.
         dist_swe = self.load_swe(results_folder)
