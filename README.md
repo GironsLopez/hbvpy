@@ -32,7 +32,7 @@ The package should be installed as well as it's dependencies. Currently, HBVpy d
 'lxml'
 'netCDF4'
 'numpy'
-'gdal',
+'gdal'
 'pandas'
 'pyproj'
 'scipy'
